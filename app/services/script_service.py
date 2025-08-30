@@ -28,6 +28,7 @@ Requirements:
 - Some lines should include an optional `infographic` field (1–3 times).
   Example: {{"character": "Peter Griffin", "text": "...", "infographic": "AI basics"}}
 - Keep it funny + informative (TikTok/MrBeast style).
+- Try to keep family guy funny vibe and use relatable characters like peter, stewie and brian ocassionaly use other character if at all required a sper scritp or dialogue context
 - Reply ONLY with valid JSON.
 """
 

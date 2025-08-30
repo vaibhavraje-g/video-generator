@@ -6,7 +6,7 @@ from app.services.asset_service import (
     fetch_character_image,
     fetch_infographic
 )
-from app.services.video_service import generate_video
+from app.services.video_service.video_service import generate_video
 
 async def main():
     topic = "What is Kafka?"
