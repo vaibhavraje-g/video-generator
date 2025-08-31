@@ -1,48 +1,55 @@
 # video_configs.py
 """
 Centralized video configuration file for easy styling & layout changes.
-Edit values here to change fonts, sizes, margins, positions, and animations.
 """
 
 # --- Text (Subtitles) Configuration ---
 TEXT_STYLE = {
-    "width_ratio": 0.9,          # fraction of video width used for wrapping
-    "max_chars": 20,             # soft target per line
-    "max_lines": 2,              # 1–2 lines typical for subtitles
-    "bottom_margin": 350,        # Increased to position text in middle area
+    "width_ratio": 0.85,           # Slightly narrower to prevent overflow
+    "max_chars_per_line": 36,      # Max characters per line
+    "max_lines": 2,                # Allow up to 2 lines
+    "bottom_margin": 350,          # Not used anymore, text is in middle
 
-    "font": "Montserrat-Bold",
-    "fontsize": 30,
-    "color": "white",
-    "align": "center",           # 'left' | 'center' | 'right'
-    "stroke_color": "Yellow",
-    "stroke_width": 2,
+    "font": "Arial-Bold",          # More reliable font (change to available font on your system)
+    "fontsize": 46,                # Font size tuned for 1080p vertical
+    "color": "white",              # White text as requested
+    "align": "center",
+    "stroke_color": None,          # No stroke as requested
+    "stroke_width": 0,             # No border
 
-    "pad_x": 20,                 # horizontal padding around text box
-    "pad_y": 10,                 # vertical padding around text box
-    "bg_color": (0, 0, 0),       # RGB tuple
-    "bg_opacity": 0.6,           # 0..1
-    # Reserve this many extra pixels as a safety band for subtitles
-    "reserve_extra": 80,
+    "pad_x": 20,                   # Padding for highlight bg
+    "pad_y": 10,                   # Padding for highlight bg
+    "bg_color_rgba": (255, 220, 0, 230),  # RGBA for rounded highlight background
+    "bg_radius": 12,
+    "reserve_extra": 50,
+    "word_spacing": 12,            # Space between words
+
+    # Chunking behavior
+    "words_per_chunk": 3,          # default 3 words per chunk (can be 3 or 4)
+    "min_chunk_duration": 0.5,     # avoid extremely short chunks
+
+    # Highlight timing inside each chunk (fraction of chunk duration)
+    "highlight_fraction": 0.75,    # highlight covers ~75% of chunk center
+    "highlight_delay_frac": 0.12,  # delay before highlight starts as fraction of chunk dur
 }
 
 TEXT_ANIMATION = {
-    "fade_in": 0.3,              # Increased for more visible animation
-    "fade_out": 0.3,             # Increased for more visible animation
+    "fade_in": 0.12,                # Smooth fade in
+    "fade_out": 0.12,               # Smooth fade out
 }
 
 # --- Infographic Overlay Config ---
 INFOGRAPHIC_CONFIG = {
-    "max_height": 250,           # px
-    "max_width": 400,            # Added max width for better centering
-    "top_margin": 80,            # px from top
+    "max_height": 200,             # Top area
+    "max_width": 350,
+    "top_margin": 50,              # Position from top
 }
 
 # --- Character Image Overlay Config ---
 CHARACTER_CONFIG = {
-    "max_height": 300,           # Reduced slightly to fit better
-    "max_width": 400,            # Added max width for better centering
-    "bottom_margin": 100,        # Adjusted for bottom positioning
+    "max_height": 250,             # Bottom area
+    "max_width": 350,
+    "bottom_margin": 50,           # Position from bottom
     "side_margin": 60,
 }
 

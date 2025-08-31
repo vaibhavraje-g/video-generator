@@ -2,9 +2,9 @@
 from moviepy.editor import ImageClip, vfx
 from PIL import Image
 import os
-from moviepy.config import change_settings 
-change_settings({"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"})
+from moviepy.config import change_settings
 
+change_settings({"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"})
 
 # Pillow >= 10 compatibility
 if not hasattr(Image, "ANTIALIAS"):
@@ -12,9 +12,7 @@ if not hasattr(Image, "ANTIALIAS"):
 
 
 def crop_to_vertical(clip, target_aspect=9/16, height=1080, width=608):
-    """
-    Crop a clip to a vertical aspect ratio and resize to target dimensions.
-    """
+    """Crop a clip to vertical aspect ratio and resize."""
     h, w = clip.h, clip.w
     if w / h > target_aspect:  # too wide → crop sides
         new_w = int(h * target_aspect)
@@ -27,49 +25,52 @@ def crop_to_vertical(clip, target_aspect=9/16, height=1080, width=608):
     return clip.resize(height=height).resize(width=width)
 
 
-def create_positioned_overlay(image_path, duration, video_size, position, max_height=300, with_animation=False):
-    """
-    Create ImageClip, resize to max_height, and position within video bounds.
-    position = (x, y) in pixels.
-    with_animation = add fade in/out animations
-    """
+def create_positioned_overlay(image_path, duration, video_size, position, max_height=300, with_animation=True):
+    """Create ImageClip with proper animations and positioning."""
     if not os.path.exists(image_path):
-        print(f"[WARN] Image not found: {image_path}")
+        print(f"[ERROR] Image not found: {image_path}")
         return None
+    
     try:
-        img = ImageClip(image_path).resize(height=max_height)
-        # Set duration first
-        img = img.set_duration(duration)
+        # Load image with transparency support
+        img = ImageClip(image_path, transparent=True, duration=duration)
         
-        # Apply animations if requested
-        if with_animation:
-            # Fade in for 0.3 seconds, fade out for 0.3 seconds
-            fade_duration = min(0.3, duration / 4)  # Don't exceed 1/4 of total duration
-            img = img.fx(vfx.fadein, fade_duration)
-            img = img.fx(vfx.fadeout, fade_duration)
+        # Resize maintaining aspect ratio
+        img = img.resize(height=max_height)
         
         # Ensure position is within bounds
         x = max(0, min(position[0], video_size[0] - img.w))
         y = max(0, min(position[1], video_size[1] - img.h))
         
-        return img.set_position((x, y))
+        # Set position
+        img = img.set_position((x, y))
+        
+        # Apply smooth animations
+        if with_animation and duration > 0.4:
+            fade_duration = min(0.2, duration / 4)
+            img = img.fx(vfx.fadein, fade_duration)
+            img = img.fx(vfx.fadeout, fade_duration)
+        
+        return img
+        
     except Exception as e:
         print(f"[ERROR] Could not load image {image_path}: {e}")
         return None
 
 
 def overlaps_with_used_areas(pos, width, height, used_areas):
-    """
-    Check whether the new rect (pos, width, height) intersects any used areas.
-    used_areas entries are (x, y, w, h).
-    """
+    """Check if new rectangle overlaps with any used areas."""
     x, y = pos
     new_rect = (x, y, x + width, y + height)
+    
     for used_x, used_y, used_w, used_h in used_areas:
         used_rect = (used_x, used_y, used_x + used_w, used_y + used_h)
+        
+        # Check for intersection
         if not (new_rect[2] <= used_rect[0] or
                 new_rect[0] >= used_rect[2] or
                 new_rect[3] <= used_rect[1] or
                 new_rect[1] >= used_rect[3]):
             return True
+    
     return False
