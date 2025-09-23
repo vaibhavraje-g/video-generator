@@ -11,11 +11,11 @@ TEXT_STYLE = {
     "bottom_margin": 350,          # Not used anymore, text is in middle
 
     "font": "Arial-Bold",          # More reliable font (change to available font on your system)
-    "fontsize": 46,                # Font size tuned for 1080p vertical
+    "fontsize": 52,                # Increased for better readability
     "color": "white",              # White text as requested
     "align": "center",
-    "stroke_color": None,          # No stroke as requested
-    "stroke_width": 0,             # No border
+    "stroke_color": "black",        # No stroke as requested
+    "stroke_width": 2,             # No border
 
     "pad_x": 20,                   # Padding for highlight bg
     "pad_y": 10,                   # Padding for highlight bg
@@ -40,17 +40,17 @@ TEXT_ANIMATION = {
 
 # --- Infographic Overlay Config ---
 INFOGRAPHIC_CONFIG = {
-    "max_height": 200,             # Top area
-    "max_width": 350,
-    "top_margin": 50,              # Position from top
+    "max_height": 260,             # Top area
+    "max_width": 455,
+    "top_margin": 80,              # Position from top
 }
 
 # --- Character Image Overlay Config ---
 CHARACTER_CONFIG = {
-    "max_height": 250,             # Bottom area
-    "max_width": 350,
-    "bottom_margin": 50,           # Position from bottom
-    "side_margin": 60,
+    "max_height": 325,             # Bottom area
+    "max_width": 455,
+    "bottom_margin": 30,           # Position from bottom
+    "side_margin": 80,
 }
 
 # --- General Video Layout ---
@@ -59,4 +59,7 @@ VIDEO_LAYOUT = {
     "output_height": 1080,
     "output_width": 608,
     "fps": 24,
+    "top_section": 0.33,   # Top 33% for infographics
+    "middle_section": 0.34, # Middle 34% for text
+    "bottom_section": 0.33, # Bottom 33% for characters
 }

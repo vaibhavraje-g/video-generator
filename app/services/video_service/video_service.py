@@ -1,5 +1,7 @@
 # video_service.py
-from moviepy.editor import VideoFileClip, CompositeVideoClip, AudioFileClip, concatenate_videoclips
+from moviepy.editor import (
+    VideoFileClip, CompositeVideoClip, AudioFileClip, concatenate_videoclips, vfx
+)
 from moviepy.config import change_settings
 from PIL import Image
 import os
@@ -13,174 +15,130 @@ if not hasattr(Image, "ANTIALIAS"):
 from .video_utils import crop_to_vertical, create_positioned_overlay, overlaps_with_used_areas
 from .text_overlay import build_text_overlay
 from .video_configs import VIDEO_LAYOUT, CHARACTER_CONFIG, INFOGRAPHIC_CONFIG
+from app.services.asset_service import fetch_character_image, fetch_infographic
 
 
-def build_character_overlay(dlg, duration, bg_segment, char_images, used_areas):
-    """Build character overlay at the bottom of the screen."""
-    overlays = []
-    char_key = getattr(dlg, "character", "").lower().strip()
-
-    if not char_images:
-        # no images provided, return empty
-        return overlays
-
-    if not char_key:
-        # dialogue doesn't specify a character
-        return overlays
-
-    if char_key not in char_images:
-        # not found; log and exit
-        print(f"[WARN] Character '{char_key}' not found in images: {list(char_images.keys())}")
-        return overlays
-
-    char_path = char_images[char_key]
-    if not os.path.exists(char_path):
-        print(f"[ERROR] Character image file not found: {char_path}")
-        return overlays
-
-    video_w, video_h = bg_segment.size
-
-    # calculate size & position to center bottom while respecting max constraints
-    max_h = CHARACTER_CONFIG.get("max_height", 250)
-    max_w = CHARACTER_CONFIG.get("max_width", 350)
-
-    # place character horizontally centered, vertically above bottom_margin
-    x_pos = max(0, (video_w - max_w) // 2)
-    y_pos = max(0, video_h - CHARACTER_CONFIG.get("bottom_margin", 50) - max_h)
-
-    overlay = create_positioned_overlay(
-        char_path, duration, (video_w, video_h),
-        (x_pos, y_pos),
-        max_h,
-        with_animation=True
-    )
-
-    if overlay:
-        # ensure overlay doesn't overlap reserved areas
-        if not overlaps_with_used_areas((x_pos, y_pos), overlay.w, overlay.h, used_areas):
-            overlays.append(overlay)
-            used_areas.append((x_pos, y_pos, overlay.w, overlay.h))
-        else:
-            print(f"[WARN] character overlay for '{char_key}' would overlap used areas; skipping.")
-    return overlays
+def clean_segment(segment):
+    """Trim leading/trailing black frames."""
+    try:
+        return segment.fx(vfx.fadein, 0).fx(vfx.fadeout, 0)
+    except:
+        return segment
 
 
-def build_infographic_overlay(i, duration, bg_segment, infographic_images, used_areas):
-    """Build infographic overlay at the top of the screen."""
-    overlays = []
-
-    if not infographic_images:
-        return overlays
-
-    if i >= len(infographic_images):
-        return overlays
-
-    path = infographic_images[i]
-    if not path or not os.path.exists(path):
-        print(f"[ERROR] Infographic image not found: {path}")
-        return overlays
-
-    video_w, video_h = bg_segment.size
-    max_h = INFOGRAPHIC_CONFIG.get("max_height", 200)
-    max_w = INFOGRAPHIC_CONFIG.get("max_width", 350)
-
-    x_pos = max(0, (video_w - max_w) // 2)
-    y_pos = INFOGRAPHIC_CONFIG.get("top_margin", 50)
-
-    overlay = create_positioned_overlay(
-        path, duration, bg_segment.size,
-        (x_pos, y_pos),
-        max_h,
-        with_animation=True
-    )
-
-    if overlay:
-        if not overlaps_with_used_areas((x_pos, y_pos), overlay.w, overlay.h, used_areas):
-            overlays.append(overlay)
-            used_areas.append((x_pos, y_pos, overlay.w, overlay.h))
-        else:
-            print(f"[WARN] infographic at index {i} would overlap used areas; skipping.")
-
-    return overlays
-
-
-def build_overlays_for_dialogue(dlg, duration, bg_segment, char_images, infographic_images, i):
-    """Build all overlays with proper layering order."""
+def build_overlays_for_dialogue(dlg, duration, bg_segment, i, script):
+    """Build text, character, and infographic overlays"""
     overlay_clips = [bg_segment]
+    video_w, video_h = bg_segment.size
     used_areas = []
 
-    # Layer order (bottom -> top):
-    # 1) infographic (top area)
-    # 2) character (bottom)
-    # 3) text (topmost)
-    infographic_overlays = build_infographic_overlay(i, duration, bg_segment, infographic_images, used_areas)
-    character_overlays = build_character_overlay(dlg, duration, bg_segment, char_images, used_areas)
-    text_overlays = build_text_overlay(dlg, duration, bg_segment, used_areas)
+    # TOP SECTION: Infographics
+    if dlg.infographic:
+        info_img = fetch_infographic(
+            script.topic,
+            dlg.text,
+            f"info_{i}.png",
+            dlg.infographic
+        )
+        if info_img:
+            info_clip = create_positioned_overlay(
+                info_img,
+                duration,
+                (video_w, video_h),
+                position=(
+                    (video_w - INFOGRAPHIC_CONFIG["max_width"]) // 2,
+                    INFOGRAPHIC_CONFIG["top_margin"]
+                ),
+                max_height=INFOGRAPHIC_CONFIG["max_height"]
+            )
+            if info_clip:
+                overlay_clips.append(info_clip)
 
-    # Add in order: background already present
-    # Infographic sits visually near top (should be behind text)
-    overlay_clips.extend(infographic_overlays)
-    # Character sits above infographic but below text
-    overlay_clips.extend(character_overlays)
-    # Finally text overlays should be on top
+    # MIDDLE SECTION: Text (handled in text_overlay.py)
+    text_overlays = build_text_overlay(dlg, duration, bg_segment, used_areas)
     overlay_clips.extend(text_overlays)
+
+    # BOTTOM SECTION: Character
+    char_img = fetch_character_image(dlg.character)
+    if char_img:
+        char_clip = create_positioned_overlay(
+            char_img,
+            duration,
+            (video_w, video_h),
+            position=(
+                (video_w - CHARACTER_CONFIG["max_width"]) // 2,
+                video_h - CHARACTER_CONFIG["max_height"] - CHARACTER_CONFIG["bottom_margin"]
+            ),
+            max_height=CHARACTER_CONFIG["max_height"]
+        )
+        if char_clip:
+            overlay_clips.append(char_clip)
 
     return overlay_clips
 
 
 def generate_video(script, tts_files, bg_video, output_path="output/final.mp4",
                    char_images=None, infographic_images=None):
-    """Generate the final video with smooth transitions."""
+    """Generate polished video without black flashes and empty sections."""
     base_clip = VideoFileClip(bg_video)
-    base_clip = crop_to_vertical(base_clip, VIDEO_LAYOUT["target_aspect_ratio"],
-                                 VIDEO_LAYOUT["output_height"], VIDEO_LAYOUT["output_width"])
-    
+    base_clip = crop_to_vertical(
+        base_clip,
+        VIDEO_LAYOUT["target_aspect_ratio"],
+        VIDEO_LAYOUT["output_height"],
+        VIDEO_LAYOUT["output_width"]
+    )
+
     segments = []
     current_time = 0
-    
+
     for i, dlg in enumerate(script.dialogues):
+        # Skip if TTS file is missing
+        if i >= len(tts_files) or not os.path.exists(tts_files[i]):
+            print(f"[WARN] Missing audio for dialogue {i}, skipping.")
+            continue
+
         audio = AudioFileClip(tts_files[i])
         duration = audio.duration
-        
-        # Get background segment
+
+        # Skip empty audio segments
+        if duration < 0.2:
+            print(f"[WARN] Very short/empty dialogue {i}, skipping.")
+            continue
+
+        # Get background video slice
         if current_time + duration <= base_clip.duration:
             bg_segment = base_clip.subclip(current_time, current_time + duration)
         else:
-            # Loop back to beginning if we run out of background
-            bg_segment = base_clip.subclip(0, duration)
+            bg_segment = base_clip.subclip(0, min(duration, base_clip.duration))
             current_time = 0
-        
-        # Build composite with all overlays
-        overlay_clips = build_overlays_for_dialogue(dlg, duration, bg_segment, char_images, infographic_images, i)
-        segment = CompositeVideoClip(overlay_clips, size=bg_segment.size)
-        segment = segment.set_audio(audio).set_duration(duration)
-        
+
+        # Build all overlays
+        overlay_clips = build_overlays_for_dialogue(dlg, duration, bg_segment, i, script)
+        segment = CompositeVideoClip(overlay_clips, size=bg_segment.size).set_audio(audio)
+
+        # Clean up fade artifacts
+        segment = clean_segment(segment)
         segments.append(segment)
         current_time += duration
-        
-        # Reset if we exceed background duration
+
         if current_time >= base_clip.duration:
             current_time = 0
 
-    # Concatenate with crossfade for smooth transitions
-    if len(segments) > 1:
-        # Add crossfade between segments to eliminate black frames
-        final = segments[0]
-        for i in range(1, len(segments)):
-            final = CompositeVideoClip([final, segments[i].set_start(final.duration - 0.1)])
-            final = final.set_duration(final.duration + segments[i].duration - 0.1)
-    else:
-        final = segments[0] if segments else None
+    # Concatenate without black frames
+    if not segments:
+        print("[ERROR] No segments generated.")
+        return None
 
-    if final:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        final.write_videofile(
-            output_path, 
-            fps=VIDEO_LAYOUT["fps"], 
-            codec="libx264", 
-            audio_codec="aac",
-            preset="medium",  # Better quality
-            threads=4
-        )
-    
+    final = concatenate_videoclips(segments, method="compose", padding=-0.05)
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    final.write_videofile(
+        output_path,
+        fps=VIDEO_LAYOUT["fps"],
+        codec="libx264",
+        audio_codec="aac",
+        preset="medium",
+        threads=4
+    )
+
     return output_path
