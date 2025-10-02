@@ -4,7 +4,7 @@ from typing import Dict
 
 
 class Settings(BaseSettings):
-     # --- Core API ---
+    # --- Core API ---
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     DEBUG: bool = False

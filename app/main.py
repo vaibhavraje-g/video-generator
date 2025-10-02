@@ -1,72 +1,87 @@
 import asyncio
-from app.services.script_service import generate_script
-from app.services.tts_service import generate_tts
-from app.services.asset_service import (
-    fetch_background_video,
-    fetch_character_image,
-    fetch_infographic
-)
-from app.services.video_service.video_service import generate_video
+from typing import Optional, List, Literal
 
-async def main():
-    topic = "What is Kafka?"
+from app.services.family_guy_video_gen.interface import generate_family_guy_video
+# from app.services.frequencies_video_gen.interface import generate_frequencies_video
+# from app.services.subliminal_video_gen.interface import generate_subliminal_video
 
-    # 1. Generate script
-    script = await generate_script(topic)
-    print("Generated script:", script.model_dump())
+VideoType = Literal["family_guy", "frequencies", "subliminal"]
 
-    # 2. Generate TTS for each dialogue
-    tts_files = []
-    for i, dlg in enumerate(script.dialogues):
-        path = f"projects/demo_project/audio/line_{i}.mp3"
-        tts_files.append(generate_tts(dlg.text, path))
 
-    # 3. Fetch character images (store keys lowercase)
-    char_images = {}
-    for dlg in script.dialogues:
-        key = dlg.character.lower().strip()
-        if key not in char_images:
-            try:
-                char_images[key] = fetch_character_image(dlg.character)
-            except Exception as e:
-                print(f"⚠️ Character image missing for {dlg.character}: {e}")
-    print("Fetched character images:", char_images)
+async def generate_video(video_type: VideoType, **kwargs) -> str:
+    """
+    Main interface for video generation. Delegates to appropriate video generator based on type.
 
-    # 4. Fetch infographic images with context-aware queries
-    infographic_images = []
-    for i, dlg in enumerate(script.dialogues):
-        # Use the infographic hint from the dialogue if available
-        infographic_hint = getattr(dlg, 'infographic', None)
-        
-        if infographic_hint:  # Only fetch if there's a specific hint
-            path = fetch_infographic(
-                topic=topic,
-                dialogue_text=dlg.text,
-                output_filename=f"info_{i}.png",
-                infographic_hint=infographic_hint
-            )
-            if path:
-                infographic_images.append(path)
-                print(f"[INFO] Added infographic for dialogue {i}: {infographic_hint}")
-            else:
-                print(f"[INFO] No infographic found for dialogue {i}, using placeholder")
-        else:
-            print(f"[INFO] No infographic hint for dialogue {i}, skipping")
+    Args:
+        video_type: Type of video to generate
+        **kwargs: Arguments specific to each video type:
 
-    # 5. Background video
-    bg_video = fetch_background_video("gameplay.mp4")
+            For "family_guy":
+                topic: str - The educational topic
+                output_path: Optional[str] - Custom output path
 
-    # 6. Generate final video
-    output_path = "projects/demo_project/output/final.mp4"
-    generate_video(
-        script,
-        tts_files,
-        bg_video,
-        output_path,
-        char_images=char_images,
-        infographic_images=infographic_images
-    )
-    print("✅ Video generated:", output_path)
+            For "frequencies":
+                frequencies: List[float] - List of frequencies in Hz
+                duration: float - Duration in seconds
+                output_path: Optional[str] - Custom output path
 
+            For "subliminal":
+                messages: List[str] - Subliminal messages
+                background_video_path: str - Background video path
+                flash_duration_ms: Optional[float] - Flash duration in ms
+                output_path: Optional[str] - Custom output path
+
+    Returns:
+        str: Path to the generated video file
+    """
+    if video_type == "family_guy":
+        return await generate_family_guy_video(
+            topic=kwargs["topic"], output_path=kwargs.get("output_path")
+        )
+
+    # elif video_type == "frequencies":
+    #     return await generate_frequencies_video(
+    #         frequencies=kwargs["frequencies"],
+    #         duration=kwargs["duration"],
+    #         output_path=kwargs.get("output_path")
+    #     )
+
+    # elif video_type == "subliminal":
+    #     return await generate_subliminal_video(
+    #         messages=kwargs["messages"],
+    #         background_video_path=kwargs["background_video_path"],
+    #         flash_duration_ms=kwargs.get("flash_duration_ms", 33.3),
+    #         output_path=kwargs.get("output_path")
+    #     )
+
+    else:
+        raise ValueError(f"Unknown video type: {video_type}")
+
+
+# Example usage
 if __name__ == "__main__":
+
+    async def main():
+        # Example 1: Generate a Family Guy style educational video
+        video_path = await generate_video(
+            video_type="family_guy", topic="how hoisting works in js?"
+        )
+        print("✅ Family Guy video generated:", video_path)
+
+        # # Example 2: Generate a frequencies video
+        # video_path = await generate_video(
+        #     video_type="frequencies",
+        #     frequencies=[432, 528, 639],  # Hz
+        #     duration=60  # seconds
+        # )
+        # print("✅ Frequencies video generated:", video_path)
+
+        # # Example 3: Generate a subliminal video
+        # video_path = await generate_video(
+        #     video_type="subliminal",
+        #     messages=["Be productive", "Stay focused", "Keep learning"],
+        #     background_video_path="assets/videos/nature_scene.mp4"
+        # )
+        # print("✅ Subliminal video generated:", video_path)
+
     asyncio.run(main())

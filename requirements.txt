@@ -25,3 +25,9 @@ pyee
 asyncio
 requests
 duckduckgo-search
+fakeyou
+pydantic_settings
+
+# Added for subliminal video generation
+scipy
+numpy

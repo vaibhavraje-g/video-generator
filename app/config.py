@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Settings:
     # Paths
     ASSETS_DIR = "assets"
@@ -11,37 +12,33 @@ class Settings:
     VIDEOS_DIR = os.path.join(ASSETS_DIR, "videos")
     TEMP_DIR = os.path.join(ASSETS_DIR, "temp")
     OUTPUT_DIR = os.path.join(ASSETS_DIR, "output")
-    
+
     # Audio settings
     TTS_LANGUAGE = "en"
     AUDIO_FORMAT = "mp3"
-    
+
     # Video settings
     VIDEO_FPS = 24
     VIDEO_CODEC = "libx264"
     AUDIO_CODEC = "aac"
-    
+
     # Character positions
-    CHARACTER_POSITIONS = {
-        "peter": "left",
-        "stewie": "right",
-        "default": "center"
-    }
-    
+    CHARACTER_POSITIONS = {"peter": "left", "stewie": "right", "default": "center"}
+
     # Text styling
     SUBTITLE_CONFIG = {
         "fontsize": 95,
         "color": "yellow",
         "font": "DejaVu-Sans-Bold",
         "stroke_color": "black",
-        "stroke_width": 0.3
+        "stroke_width": 0.3,
     }
-    
+
     TITLE_CONFIG = {
         "fontsize": 60,
         "color": "white",
         "font": "Arial-Bold",
-        "bg_color": "black"
+        "bg_color": "black",
     }
 
     @classmethod
@@ -52,9 +49,10 @@ class Settings:
             cls.CHARACTERS_DIR,
             cls.VIDEOS_DIR,
             cls.TEMP_DIR,
-            cls.OUTPUT_DIR
+            cls.OUTPUT_DIR,
         ]
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
+
 
 settings = Settings()
