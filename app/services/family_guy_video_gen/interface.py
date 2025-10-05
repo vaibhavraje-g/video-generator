@@ -93,8 +93,7 @@ async def generate_family_guy_video(
 
     # Run audio generation and infographic fetching simultaneously
     audio_paths, infographic_paths = await asyncio.gather(
-        generate_all_audio(),
-        fetch_all_infographics()
+        generate_all_audio(), fetch_all_infographics()
     )
 
     # Generate final video

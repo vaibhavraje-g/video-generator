@@ -102,7 +102,7 @@ def generate_video(
     """Generate polished video without black flashes and empty sections."""
     clips_to_close = []  # Keep track of all clips to properly close
     temp_files = []  # Track temporary files to clean up
-    
+
     try:
         # Initialize base clip
         base_clip = VideoFileClip(bg_video)
@@ -168,12 +168,12 @@ def generate_video(
         clips_to_close.append(final)
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         # Create a temporary file in the system temp directory
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
             temp_output = temp_file.name
             temp_files.append(temp_output)
-        
+
         try:
             # Write video with safe parameters that work with MoviePy
             final.write_videofile(
@@ -188,7 +188,7 @@ def generate_video(
                 logger=None,  # Disable MoviePy logging to prevent conflicts
                 verbose=False,  # Reduce console output
             )
-            
+
             # Verify the temporary file was created and has content
             if os.path.exists(temp_output) and os.path.getsize(temp_output) > 0:
                 # Rename temp file to final output
@@ -197,9 +197,11 @@ def generate_video(
                 os.rename(temp_output, output_path)
                 temp_files.remove(temp_output)  # Remove from cleanup list
             else:
-                print(f"[ERROR] Generated video file is empty or missing: {temp_output}")
+                print(
+                    f"[ERROR] Generated video file is empty or missing: {temp_output}"
+                )
                 return None
-                
+
         except Exception as e:
             print(f"Error writing video file: {e}")
             if os.path.exists(temp_output):
@@ -223,7 +225,7 @@ def generate_video(
                     clip.close()
             except Exception as e:
                 print(f"Warning: Error while closing clip: {e}")
-        
+
         # Clean up temporary files
         for temp_file in temp_files:
             try:
