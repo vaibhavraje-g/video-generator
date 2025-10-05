@@ -64,7 +64,8 @@ if __name__ == "__main__":
     async def main():
         # Example 1: Generate a Family Guy style educational video
         video_path = await generate_video(
-            video_type="family_guy", topic="how hoisting works in js?"
+            video_type="family_guy",
+            topic="Create a short (50–60s) video where Peter explains how this video was made programmatically using MoviePy and Chatterbox for voice cloning. Keep it simple and engaging for the 'Peter Talks Tech' channel. End by saying: 'Comment below to get the free video generator link — I’ll DM it to you!'",
         )
         print("✅ Family Guy video generated:", video_path)
 

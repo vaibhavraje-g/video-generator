@@ -31,3 +31,10 @@ pydantic_settings
 # Added for subliminal video generation
 scipy
 numpy
+gradio_client
+websockets>=12.0
+gradio_client>=0.8.0
+torch
+gradio
+chatterbox-tts
+

@@ -1,113 +1,252 @@
 import os
+import random
+import numpy as np
+import torch
 from pathlib import Path
 from gtts import gTTS
-import requests
-import zipfile
-import io
+from chatterbox.tts import ChatterboxTTS
 
-# ----------------------------
-# CONFIG
-# ----------------------------
-RVC_API_URL = "http://localhost:5500/convert"  # Your RVC WebUI Docker API
-MODELS_DIR = Path("models/family_guy")
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
+# Configuration
+# Script location: app/services/shared_services/tts_service.py
+# Navigate up to project root: ../../../
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.resolve()
+VOICE_SAMPLES_DIR = PROJECT_ROOT / "assets" / "voice_samples"
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Mapping of characters to model download URLs
-CHARACTER_MODELS = {
-    "peter": "https://huggingface.co/AIMan2001/PeterGriffin/resolve/main/Peter%20Griffin.zip",
-    "stewie": "https://voice-models.com/model/1q9IaVn8Ege",
-    "meg": "https://huggingface.co/iatop65/RVC_Voices/resolve/main/Meg_Griffin_Mila_Kunis.zip"
+# Device configuration
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Character voice reference audio paths
+CHARACTER_VOICES = {
+    "peter": VOICE_SAMPLES_DIR / "peter_voice.mp3",
+    "brian": VOICE_SAMPLES_DIR / "brian_voice.mp3",
+    "stewie": VOICE_SAMPLES_DIR / "stewie_voice.mp3",
+}
+
+# Character name mappings (handles variations like "peter griffin", "Peter", etc.)
+CHARACTER_MAPPINGS = {
+    "peter": "peter",
+    "peter griffin": "peter",
+    "brian": "brian",
+    "brian griffin": "brian",
+    "stewie": "stewie",
+    "stewie griffin": "stewie",
 }
 
 
-# ----------------------------
-# UTILITY FUNCTIONS
-# ----------------------------
-def download_and_extract_model(character: str):
-    """Download character model if not already present."""
-    model_path = MODELS_DIR / f"{character}.pth"
-    if model_path.exists():
-        return model_path
-
-    url = CHARACTER_MODELS.get(character)
-    if not url:
-        raise ValueError(f"No model URL defined for character: {character}")
-
-    print(f"📥 Downloading {character} model from {url} ...")
-    r = requests.get(url)
-    r.raise_for_status()
-
-    # Handle zip extraction if needed
-    if url.endswith(".zip"):
-        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-            # Extract first .pth file found (assumes RVC model format)
-            for file in z.namelist():
-                if file.endswith(".pth"):
-                    z.extract(file, MODELS_DIR)
-                    extracted_path = MODELS_DIR / os.path.basename(file)
-                    os.rename(extracted_path, model_path)
-                    print(f"✅ Extracted model to {model_path}")
-                    break
-            else:
-                raise RuntimeError(f"No .pth file found in zip for {character}")
-    else:
-        # Directly save as .pth
-        with open(model_path, "wb") as f:
-            f.write(r.content)
-        print(f"✅ Saved model to {model_path}")
-
-    return model_path
-
-
-def convert_with_rvc(base_audio_path: str, character: str, output_path: str) -> str:
-    """Send base audio to RVC API to convert to character voice."""
-    # Ensure model is downloaded
-    model_path = download_and_extract_model(character)
-
-    print(f"🎭 Converting '{base_audio_path}' to {character} voice via RVC API ...")
-    with open(base_audio_path, "rb") as f:
-        files = {"audio": f}
-        data = {"model": str(model_path.name)}
-        response = requests.post(RVC_API_URL, files=files, data=data)
-
-    if response.status_code == 200:
-        Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
-        with open(output_path, "wb") as out_f:
-            out_f.write(response.content)
-        print(f"✅ Converted audio saved to {output_path}")
-        return output_path
-    else:
-        raise RuntimeError(f"RVC conversion failed: {response.status_code} {response.text}")
-
-
-# ----------------------------
-# MAIN FUNCTION
-# ----------------------------
-def generate_tts(
-    text: str, output_path: str, character: str = None, language: str = "en"
-) -> str:
+def normalize_character_name(character: str) -> str:
     """
-    Generate TTS for given text and save as mp3.
+    Normalize character name to match available voices.
+    Handles variations like 'Peter Griffin', 'peter', 'STEWIE', etc.
     
-    If `character` is provided, generate cloned voice via RVC.
-    Otherwise, fallback to normal gTTS.
+    Args:
+        character: Character name (can be 'peter', 'Peter Griffin', etc.)
+    
+    Returns:
+        Normalized character name or None if not found
     """
-    Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
-
     if not character:
-        # Normal gTTS
-        tts = gTTS(text=text, lang=language)
-        tts.save(output_path)
-        print(f"✅ Normal TTS saved to {output_path}")
-        return output_path
+        return None
+    
+    # Convert to lowercase for matching
+    character_lower = character.lower().strip()
+    
+    # Direct match in mappings
+    if character_lower in CHARACTER_MAPPINGS:
+        return CHARACTER_MAPPINGS[character_lower]
+    
+    # Fuzzy search - check if any known character name is in the input
+    for known_name, mapped_name in CHARACTER_MAPPINGS.items():
+        if known_name in character_lower:
+            return mapped_name
+    
+    # Check if input contains any of our base character names
+    for base_char in CHARACTER_VOICES.keys():
+        if base_char in character_lower:
+            return base_char
+    
+    return None
+
+# Global model instance (loaded once)
+_model_instance = None
+
+
+def set_seed(seed: int):
+    """Set random seed for reproducibility"""
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+def get_model():
+    """Get or load the ChatterboxTTS model (singleton pattern)"""
+    global _model_instance
+    if _model_instance is None:
+        print(f"🔧 Loading ChatterboxTTS model on {DEVICE}...")
+        _model_instance = ChatterboxTTS.from_pretrained(DEVICE)
+        print("✅ Model loaded successfully!")
+    return _model_instance
+
+
+def generate_gtts(text: str, output_path: str):
+    """Generate basic TTS using gTTS (fallback)"""
+    print("🔊 Generating basic TTS with gTTS...")
+    tts = gTTS(text=text, lang='en', slow=False)
+    tts.save(output_path)
+    print(f"✅ Basic TTS saved to: {output_path}")
+    return output_path
+
+
+def generate_character_tts(
+    text: str,
+    character: str,
+    output_path: str,
+    exaggeration: float = 0.5,
+    temperature: float = 0.8,
+    seed: int = 0,
+    cfg_weight: float = 0.5,
+    min_p: float = 0.05,
+    top_p: float = 1.0,
+    repetition_penalty: float = 1.2
+):
+    """Generate TTS with character voice using ChatterboxTTS"""
+    
+    # Normalize character name
+    normalized_char = normalize_character_name(character)
+    
+    if not normalized_char:
+        raise ValueError(f"Unknown character: {character}. Available: {list(CHARACTER_VOICES.keys())}")
+    
+    # Get reference audio path
+    audio_prompt_path = CHARACTER_VOICES[normalized_char]
+    
+    if not audio_prompt_path.exists():
+        raise FileNotFoundError(f"Voice sample not found: {audio_prompt_path}")
+    
+    print(f"🎭 Generating TTS for character: {character} → {normalized_char}")
+    print(f"📝 Text: {text[:100]}..." if len(text) > 100 else f"📝 Text: {text}")
+    print(f"🎤 Using reference: {audio_prompt_path}")
+    
+    # Load model
+    model = get_model()
+    
+    # Set seed if specified
+    if seed != 0:
+        set_seed(seed)
+    
+    # Generate audio
+    wav = model.generate(
+        text,
+        audio_prompt_path=str(audio_prompt_path),
+        exaggeration=exaggeration,
+        temperature=temperature,
+        cfg_weight=cfg_weight,
+        min_p=min_p,
+        top_p=top_p,
+        repetition_penalty=repetition_penalty,
+    )
+    
+    # Save audio
+    import scipy.io.wavfile as wavfile
+    wavfile.write(output_path, model.sr, wav.squeeze(0).numpy())
+    
+    print(f"✅ Character TTS saved to: {output_path}")
+    return output_path
+
+
+def generate_tts(
+    text: str,
+    output_path: str,
+    character: str = None,
+    **kwargs
+):
+    """
+    Main TTS generation function
+    
+    Args:
+        text: Text to synthesize
+        output_path: Output file path
+        character: Character name (peter, brian, stewie, or variations like 'Peter Griffin') or None for basic TTS
+        **kwargs: Additional parameters for ChatterboxTTS (exaggeration, temperature, etc.)
+    
+    Returns:
+        Path to generated audio file
+    """
+    
+    # Ensure output directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    # Normalize and check character
+    if character:
+        normalized_char = normalize_character_name(character)
+        
+        if normalized_char:
+            # Use character voice
+            try:
+                return generate_character_tts(text, character, output_path, **kwargs)
+            except Exception as e:
+                print(f"⚠️ Character TTS failed: {e}")
+                print("🔄 Falling back to basic TTS...")
+                return generate_gtts(text, output_path)
+        else:
+            # Unknown character
+            print(f"⚠️ Unknown character '{character}', using basic TTS")
+            return generate_gtts(text, output_path)
     else:
-        # Generate base audio using gTTS
-        base_path = MODELS_DIR / "base_temp.wav"
-        tts = gTTS(text=text, lang=language)
-        tts.save(base_path)
+        # No character specified - use basic gTTS
+        return generate_gtts(text, output_path)
 
-        # Convert via RVC
-        result_path = convert_with_rvc(str(base_path), character, output_path)
-        os.remove(base_path)  # clean up temp
-        return result_path
 
+# Convenience functions for each character
+def generate_peter_voice(text: str, output_path: str, **kwargs):
+    """Generate TTS in Peter Griffin's voice"""
+    return generate_tts(text, output_path, character="peter", **kwargs)
+
+
+def generate_brian_voice(text: str, output_path: str, **kwargs):
+    """Generate TTS in Brian's voice"""
+    return generate_tts(text, output_path, character="brian", **kwargs)
+
+
+def generate_stewie_voice(text: str, output_path: str, **kwargs):
+    """Generate TTS in Stewie's voice"""
+    return generate_tts(text, output_path, character="stewie", **kwargs)
+
+
+if __name__ == "__main__":
+    print("🚀 ChatterboxTTS Character Voice Service")
+    print("=" * 60)
+    
+    # Test with each character
+    test_text = "Hey there! This is a test of the character voice cloning system."
+    
+    test_cases = [
+        ("peter", "Peter Griffin voice"),
+        ("brian", "Brian voice"),
+        ("stewie", "Stewie voice"),
+        (None, "Basic gTTS voice"),
+    ]
+    
+    for character, description in test_cases:
+        print(f"\n🧪 Testing {description}...")
+        output_file = OUTPUTS_DIR / f"test_{character or 'basic'}.wav"
+        
+        try:
+            generate_tts(
+                text=test_text,
+                output_path=str(output_file),
+                character=character,
+                exaggeration=0.5,
+                temperature=0.8,
+                cfg_weight=0.5
+            )
+            print(f"✅ Success! Output: {output_file}")
+        except Exception as e:
+            print(f"❌ Failed: {e}")
+    
+    print("\n" + "=" * 60)
+    print("🎉 Testing complete!")
+    print(f"📂 Check outputs in: {OUTPUTS_DIR}")
