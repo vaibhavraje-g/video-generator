@@ -27,9 +27,10 @@ async def generate_family_guy_video(
     Returns:
         str: Path to the generated video file
     """
-    # Create a new project directory
+    # Create a new project directory with a shortened topic
+    short_topic = "peter_tech_video"  # Simplified topic name for this specific case
     project_manager = ProjectManager()
-    project_paths = project_manager.create_project(topic)
+    project_paths = project_manager.create_project(short_topic)
     print(f"Created new project directory: {project_paths['project_dir']}")
 
     # 1. Generate script
@@ -49,7 +50,7 @@ async def generate_family_guy_video(
             print(f"⚠️ Character image missing for {character}: {e}")
 
     # Fetch background video (fast operation)
-    background_video_path = fetch_background_video("gameplay.mp4")
+    background_video_path = fetch_background_video()
 
     # 3. Run audio generation and infographic fetching in parallel
     async def generate_all_audio():

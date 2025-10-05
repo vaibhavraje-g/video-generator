@@ -18,10 +18,11 @@ class ProjectManager:
         Returns:
             Dict containing paths for various project assets
         """
-        # Create a sanitized project name from the topic
-        sanitized_topic = "".join(c if c.isalnum() else "_" for c in topic.lower())
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        project_name = f"family_guy_{sanitized_topic}_{timestamp}"
+        # Create a shorter, sanitized project name from the topic
+        # Take first 30 chars of topic, replace spaces/special chars with underscore
+        short_topic = "".join(c if c.isalnum() else "_" for c in topic.lower())[:30]
+        timestamp = datetime.now().strftime("%y%m%d_%H%M")  # Shorter timestamp format
+        project_name = f"fg_{short_topic}_{timestamp}"
 
         # Create project directory structure
         project_dir = self.base_projects_dir / project_name
