@@ -3,9 +3,9 @@ import random
 from pathlib import Path
 from typing import Optional
 
-from app.services.family_guy_video_gen.image_search import ImageSearchService
-from app.services.family_guy_video_gen.image_download import ImageDownloadService
-from app.services.family_guy_video_gen.placeholder_service import create_placeholder
+from .image_search import ImageSearchService
+from .image_download import ImageDownloadService
+from .placeholder_service import create_placeholder
 
 # Directories (relative to project root)
 # Calculate the root directory by finding the directory containing 'app'
@@ -15,7 +15,6 @@ while current_path.name != "app":
 BASE_DIR = current_path.parent  # Go one level up from 'app' to get to root
 CHARACTER_IMAGES_DIR = BASE_DIR / "assets" / "characters"
 BACKGROUND_VIDEOS_DIR = BASE_DIR / "assets" / "videos" / "gameplay_bg_videos"
-INFOGRAPHICS_DIR = BASE_DIR / "assets" / "infographics"
 
 # Character mapping
 CHARACTER_MAP = {
@@ -31,8 +30,6 @@ class AssetService:
     def __init__(self):
         self.character_dir = CHARACTER_IMAGES_DIR
         self.bg_video_dir = BACKGROUND_VIDEOS_DIR
-        self.infographic_dir = INFOGRAPHICS_DIR
-        self.infographic_dir.mkdir(parents=True, exist_ok=True)
 
         # Services for external assets
         self.image_search = ImageSearchService()
@@ -86,7 +83,8 @@ class AssetService:
     ) -> str:
         """Fetch or generate infographic; always returns a valid image path."""
         query = self.generate_smart_search_query(topic, dialogue_text, infographic_hint)
-        output_path = self.infographic_dir / output_filename
+        # Use the output_filename directly (it's already project-specific)
+        output_path = Path(output_filename)
 
         # Try external search
         results = self.image_search.search_with_fallbacks(query, max_results=5)

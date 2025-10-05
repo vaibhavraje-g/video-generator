@@ -26,7 +26,7 @@ from .video_utils import (
 )
 from .text_overlay import build_text_overlay
 from .video_configs import VIDEO_LAYOUT, CHARACTER_CONFIG, INFOGRAPHIC_CONFIG
-from app.services.family_guy_video_gen.asset_service import (
+from ..assets_service.asset_service import (
     fetch_character_image,
     fetch_infographic,
 )

@@ -4,7 +4,7 @@ import os
 
 from .script_service import generate_script
 from ..shared_services.tts_service import generate_tts
-from .asset_service import (
+from .assets_service.asset_service import (
     fetch_background_video,
     fetch_character_image,
     fetch_infographic,

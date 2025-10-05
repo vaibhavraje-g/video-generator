@@ -57,8 +57,8 @@ class ImageSearchService:
     def search_with_fallbacks(self, query: str, max_results: int = 3) -> list[dict]:
         """Try multiple sources in order of preference"""
         sources = [
-            self.search_pixabay,
             self.search_duckduckgo,
+            self.search_pixabay,
             # Add Bing/Selenium later if needed
         ]
         for source_fn in sources:
