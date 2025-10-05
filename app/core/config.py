@@ -9,8 +9,11 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     DEBUG: bool = False
 
-    # --- LLM Config ---
+    # --- API Keys ---
     GEMINI_API_KEY: str | None = None
+    PIXABAY_API_KEY: str | None = None
+
+    # --- LLM Config ---
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # --- Video backend ---
@@ -35,13 +38,63 @@ class Settings(BaseSettings):
         "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_MEDIUM_AND_ABOVE",
     }
 
-    # Other project configs
+    # --- Project paths ---
     PROJECTS_DIR: str = "projects"
-    COMMON_ASSETS_DIR: str = "assets/common"
+    ASSETS_DIR: str = "assets"
+    CHARACTERS_DIR: str = "assets/characters"
+    VIDEOS_DIR: str = "assets/videos"
+    TEMP_DIR: str = "assets/temp"
+    OUTPUT_DIR: str = "assets/output"
+
+    # --- Audio settings ---
+    TTS_LANGUAGE: str = "en"
+    AUDIO_FORMAT: str = "mp3"
+    AUDIO_CODEC: str = "aac"
+
+    # --- Video settings ---
+    VIDEO_FPS: int = 24
+    VIDEO_CODEC: str = "libx264"
+
+    # --- Character positions ---
+    CHARACTER_POSITIONS: Dict[str, str] = {
+        "peter": "left",
+        "stewie": "right",
+        "default": "center"
+    }
+
+    # --- Text styling ---
+    SUBTITLE_CONFIG: Dict[str, str | int | float] = {
+        "fontsize": 95,
+        "color": "yellow",
+        "font": "DejaVu-Sans-Bold",
+        "stroke_color": "black",
+        "stroke_width": 0.3,
+    }
+
+    TITLE_CONFIG: Dict[str, str | int] = {
+        "fontsize": 60,
+        "color": "white",
+        "font": "Arial-Bold",
+        "bg_color": "black",
+    }
 
     class Config:
         env_file = ".env"
         case_sensitive = False
+
+    @classmethod
+    def ensure_directories(cls):
+        """Create all necessary directories if they don't exist"""
+        import os
+        directories = [
+            cls.ASSETS_DIR,
+            cls.CHARACTERS_DIR,
+            cls.VIDEOS_DIR,
+            cls.TEMP_DIR,
+            cls.OUTPUT_DIR,
+        ]
+        for directory in directories:
+            os.makedirs(directory, exist_ok=True)
 
 
 settings = Settings()

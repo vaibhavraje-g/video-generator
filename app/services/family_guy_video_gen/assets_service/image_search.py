@@ -7,9 +7,11 @@ from urllib.parse import quote_plus
 
 logger = logging.getLogger(__name__)
 
+from app.core.config import settings
+
 class ImageSearchService:
     def __init__(self):
-        self.pixabay_api_key = "YOUR_PIXABAY_API_KEY"  # Get free key at https://pixabay.com/api/docs/
+        self.pixabay_api_key = settings.PIXABAY_API_KEY  # Get free key from settings
 
     def search_pixabay(self, query: str, max_results: int = 3) -> list[dict]:
         """Search Pixabay for relevant images (supports 'diagram', 'infographic' etc.)"""
@@ -42,13 +44,11 @@ class ImageSearchService:
             from ddgs import DDGS  # pip install ddgs
             time.sleep(random.uniform(1, 2))
             with DDGS() as ddgs:
-                results = list(ddgs.images(
-                    keywords=query,
-                    region="us-en",
-                    safesearch="moderate",
-                    size="Medium",
-                    max_results=max_results
-                ))
+                results = []
+                for r in ddgs.images(query):
+                    results.append(r)
+                    if len(results) >= max_results:
+                        break
             return [{"image": r["image"], "source": "duckduckgo"} for r in results]
         except Exception as e:
             logger.warning(f"DuckDuckGo (ddgs) failed: {e}")
