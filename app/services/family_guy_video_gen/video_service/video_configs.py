@@ -1,52 +1,67 @@
-# video_configs.py
 """
-Centralized video configuration file for easy styling & layout changes.
+Centralized video configuration file for styling, layout, and speed control.
 """
 
 # --- Text (Subtitles) Configuration ---
 TEXT_STYLE = {
-    "width_ratio": 0.85,  # Slightly narrower to prevent overflow
-    "max_chars_per_line": 36,  # Max characters per line
-    "max_lines": 2,  # Allow up to 2 lines
-    "bottom_margin": 350,  # Not used anymore, text is in middle
-    "font": "Arial-Bold",  # More reliable font (change to available font on your system)
-    "fontsize": 52,  # Increased for better readability
-    "color": "white",  # White text as requested
+    "width_ratio": 0.85,
+    "max_chars_per_line": 36,
+    "max_lines": 2,
+    "font": "Impact",
+    "fontsize": 56,
+    "font_name": ".LuckiestGuy-Regular.ttf",
+    "color": "white",
+    "gradient_colors": ["#FFD700", "#FFA500"],
     "align": "center",
-    "stroke_color": "black",  # No stroke as requested
-    "stroke_width": 2,  # No border
-    "pad_x": 20,  # Padding for highlight bg
-    "pad_y": 10,  # Padding for highlight bg
-    "bg_color_rgba": (255, 220, 0, 230),  # RGBA for rounded highlight background
-    "bg_radius": 12,
+    "stroke_color": "black",
+    "stroke_width": 3,
+    "shadow_color": "rgba(0,0,0,0.7)",
+    "shadow_offset": (3, 3),
+    "pad_x": 25,
+    "pad_y": 15,
+    "bg_color_rgba": (255, 255, 255, 25),
+    "bg_radius": 15,
     "reserve_extra": 50,
-    "word_spacing": 12,  # Space between words
-    # Chunking behavior
-    "words_per_chunk": 3,  # default 3 words per chunk (can be 3 or 4)
-    "min_chunk_duration": 0.5,  # avoid extremely short chunks
-    # Highlight timing inside each chunk (fraction of chunk duration)
-    "highlight_fraction": 0.75,  # highlight covers ~75% of chunk center
-    "highlight_delay_frac": 0.12,  # delay before highlight starts as fraction of chunk dur
+    "word_spacing": 14,
+    "words_per_chunk": 3,
+    "min_chunk_duration": 0.5,
+    "highlight_fraction": 0.75,
+    "highlight_delay_frac": 0.12,
 }
 
 TEXT_ANIMATION = {
-    "fade_in": 0.12,  # Smooth fade in
-    "fade_out": 0.12,  # Smooth fade out
+    "fade_in": 0.15,
+    "fade_out": 0.15,
+    "slide_in": True,
+    "slide_direction": "bottom",
+    "bounce_effect": True,
+    "scale_in": 1.1,
+}
+
+# --- Animation Configuration ---
+ANIMATION_CONFIG = {
+    "slide_duration": 0.3,
+    "fade_duration": 0.2,
+    "ease_type": "cubic",
+    "overshoot": 1.05,
+    "stagger_delay": 0.05,
 }
 
 # --- Infographic Overlay Config ---
 INFOGRAPHIC_CONFIG = {
-    "max_height": 260,  # Top area
-    "max_width": 455,
-    "top_margin": 80,  # Position from top
+    "max_height": 300,
+    "max_width": 500,
+    "top_margin": 80,
+    "animation": "slide_right",
 }
 
 # --- Character Image Overlay Config ---
 CHARACTER_CONFIG = {
-    "max_height": 325,  # Bottom area
-    "max_width": 455,
-    "bottom_margin": 30,  # Position from bottom
-    "side_margin": 80,
+    "max_height": 325,
+    "max_width": 450,
+    "bottom_margin": 30,
+    "side_margin": 50,
+    "animation": "slide_left",
 }
 
 # --- General Video Layout ---
@@ -55,7 +70,10 @@ VIDEO_LAYOUT = {
     "output_height": 1080,
     "output_width": 608,
     "fps": 24,
-    "top_section": 0.33,  # Top 33% for infographics
-    "middle_section": 0.34,  # Middle 34% for text
-    "bottom_section": 0.33,  # Bottom 33% for characters
+    "top_section": 0.33,
+    "middle_section": 0.34,
+    "bottom_section": 0.33,
 }
+
+# --- Playback speed ---
+VIDEO_SPEED = 1.1  # 1.0 = normal speed, 1.1 = 10% faster

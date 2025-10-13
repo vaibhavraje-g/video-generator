@@ -1,85 +1,91 @@
-# text_overlay.py
-from moviepy.editor import TextClip, vfx
+from moviepy.editor import TextClip, CompositeVideoClip, ColorClip
 from moviepy.config import change_settings
-from .video_configs import TEXT_STYLE, TEXT_ANIMATION, VIDEO_LAYOUT
+change_settings({"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"})
 
-change_settings(
-    {"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"}
-)
+from .video_configs import TEXT_STYLE, VIDEO_LAYOUT
 
-
-# -------------------------
-# Helpers
-# -------------------------
-def split_text_to_chunks(text, duration, words_per_chunk=3):
-    """Split dialogue into fixed-size chunks of 3-4 words."""
-    words = text.split()
-    if not words:
-        return []
-
-    chunks, i = [], 0
-    word_time = duration / len(words)
-    current_time = 0.0
-
-    while i < len(words):
-        chunk_words = words[i : i + words_per_chunk]
-        chunk_text = " ".join(chunk_words)
-        chunk_dur = word_time * len(chunk_words)
-        chunks.append((chunk_text, current_time, chunk_dur))
-        current_time += chunk_dur
-        i += words_per_chunk
-
-    return chunks
-
-
-# -------------------------
-# Main: build_text_overlay
-# -------------------------
-def build_text_overlay(dlg, duration, bg_segment, used_areas):
+def build_animated_text_overlay(dlg, duration, bg_segment, used_areas):
     """
-    Build professional subtitles with white text and black stroke
+    Smooth karaoke-style overlay (single centered line):
+    - Only one line of text on screen at a time
+    - Auto-wrap text to fit video width
+    - Smooth word-by-word highlight transition
+    - Centered vertically & horizontally
     """
     overlays = []
     video_w, video_h = bg_segment.size
-    fontsize = TEXT_STYLE.get("fontsize", 60)
-    font_name = TEXT_STYLE.get("font", "Arial-Bold")
-    words_per_chunk = TEXT_STYLE.get("words_per_chunk", 3)
+    fontsize = TEXT_STYLE["fontsize"]
+    font_name = TEXT_STYLE["font"]
+    pad = 6
+    max_line_width = int(video_w * 0.85)
+    max_chars_per_line = 40  # safety limit to avoid overflow
 
-    chunks = split_text_to_chunks(dlg.text, duration, words_per_chunk)
+    words = dlg.text.split()
+    if not words:
+        return []
 
-    # Position in MIDDLE third of screen
-    middle_start = video_h * VIDEO_LAYOUT["top_section"]
-    middle_end = video_h * (
-        VIDEO_LAYOUT["top_section"] + VIDEO_LAYOUT["middle_section"]
-    )
-    y_pos = int((middle_start + middle_end) / 2)
+    # Break into short segments to avoid overflow
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = " ".join(current_line + [word])
+        test_clip = TextClip(test_line, fontsize=fontsize, font=font_name, method="label")
+        if test_clip.w <= max_line_width and len(test_line) <= max_chars_per_line:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = [word]
+        test_clip.close()
+    if current_line:
+        lines.append(current_line)
 
-    for text, start, dur in chunks:
-        try:
-            txt_clip = (
-                TextClip(
-                    txt=text,
-                    fontsize=fontsize,
-                    color=TEXT_STYLE["color"],
-                    stroke_color=TEXT_STYLE["stroke_color"],
-                    stroke_width=TEXT_STYLE["stroke_width"],
-                    font=font_name,
-                    method="caption",
-                    align="center",
-                    size=(int(video_w * 0.85), None),  # Wider for middle section
-                )
-                .set_position(("center", y_pos))
-                .set_start(start)
-                .set_duration(dur)
-            )
+    total_words = len(words)
+    word_duration = duration / total_words
+    clips = []
 
-            # Smooth fade in/out
-            fade_d = min(TEXT_ANIMATION.get("fade_in", 0.1), dur / 4)
-            if fade_d > 0:
-                txt_clip = txt_clip.fx(vfx.fadein, fade_d).fx(vfx.fadeout, fade_d)
+    # Center vertically
+    y_center = int(video_h * (VIDEO_LAYOUT["top_section"] + VIDEO_LAYOUT["middle_section"]/2))
 
-            overlays.append(txt_clip)
-        except Exception as e:
-            print(f"[ERROR] text overlay failed for '{text}': {e}")
+    word_idx = 0
+    for line_words in lines:
+        line_text = " ".join(line_words)
 
+        # Center horizontally
+        temp_clip = TextClip(line_text, fontsize=fontsize, font=font_name, method="label")
+        line_x = (video_w - temp_clip.w) // 2
+        line_y = y_center - temp_clip.h // 2
+        temp_clip.close()
+
+        for i, word in enumerate(line_words):
+            pre_words = " ".join(line_words[:i])
+            pre_width = TextClip(pre_words, fontsize=fontsize, font=font_name, method="label").w if pre_words else 0
+            cur_word_clip = TextClip(word, fontsize=fontsize, font=font_name, method="label")
+
+            # Highlight current word
+            highlight = ColorClip(
+                size=(cur_word_clip.w + pad*2, cur_word_clip.h + pad*2),
+                color=(255, 230, 100)
+            ).set_start(word_idx * word_duration).set_duration(word_duration)
+            highlight = highlight.set_position((line_x + pre_width - pad, line_y - pad))
+            clips.append(highlight)
+
+            # Base text (all words visible)
+            base_line_clip = TextClip(
+                line_text,
+                fontsize=fontsize,
+                font=font_name,
+                color=TEXT_STYLE["color"],
+                stroke_color=TEXT_STYLE["stroke_color"],
+                stroke_width=TEXT_STYLE["stroke_width"],
+                method="label"
+            ).set_start(word_idx * word_duration).set_duration(word_duration)
+            base_line_clip = base_line_clip.set_position((line_x, line_y))
+            clips.append(base_line_clip)
+
+            word_idx += 1
+            cur_word_clip.close()
+
+    composite = CompositeVideoClip(clips, size=bg_segment.size).set_duration(duration)
+    overlays.append(composite)
     return overlays

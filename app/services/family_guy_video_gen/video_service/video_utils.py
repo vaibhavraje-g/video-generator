@@ -2,6 +2,7 @@
 from moviepy.editor import ImageClip, vfx
 from PIL import Image
 import os
+import numpy as np
 from moviepy.config import change_settings
 
 change_settings(
@@ -27,10 +28,31 @@ def crop_to_vertical(clip, target_aspect=9 / 16, height=1080, width=608):
     return clip.resize(height=height).resize(width=width)
 
 
-def create_positioned_overlay(
-    image_path, duration, video_size, position, max_height=300, with_animation=True
+def ease_in_out_cubic(t):
+    """Cubic easing function for smooth animation."""
+    if t < 0.5:
+        return 4 * t * t * t
+    p = 2 * t - 2
+    return 1 + p * p * p / 2
+
+
+def ease_out_back(t):
+    """Ease out with slight overshoot for bounce effect."""
+    c1 = 1.70158
+    c3 = c1 + 1
+    return 1 + c3 * pow(t - 1, 3) + c1 * pow(t - 1, 2)
+
+
+def create_animated_overlay(
+    image_path, 
+    duration, 
+    video_size, 
+    final_position, 
+    max_height=300,
+    animation_type="slide_left",
+    animation_config=None
 ):
-    """Create ImageClip with proper animations and positioning."""
+    """Create ImageClip with smooth slide transitions and animations."""
     if not os.path.exists(image_path):
         print(f"[ERROR] Image not found: {image_path}")
         return None
@@ -38,28 +60,99 @@ def create_positioned_overlay(
     try:
         # Load image with transparency support
         img = ImageClip(image_path, transparent=True, duration=duration)
-
+        
         # Resize maintaining aspect ratio
         img = img.resize(height=max_height)
-
-        # Ensure position is within bounds
-        x = max(0, min(position[0], video_size[0] - img.w))
-        y = max(0, min(position[1], video_size[1] - img.h))
-
-        # Set position
-        img = img.set_position((x, y))
-
-        # Apply smooth animations
-        if with_animation and duration > 0.4:
-            fade_duration = min(0.2, duration / 4)
+        
+        video_w, video_h = video_size
+        final_x, final_y = final_position
+        
+        # Get animation settings
+        if animation_config is None:
+            animation_config = {}
+        
+        slide_duration = animation_config.get("slide_duration", 0.3)
+        fade_duration = animation_config.get("fade_duration", 0.2)
+        ease_type = animation_config.get("ease_type", "cubic")
+        
+        # Choose easing function
+        if ease_type == "bounce":
+            ease_func = ease_out_back
+        else:
+            ease_func = ease_in_out_cubic
+        
+        # Create position function for slide animation
+        def make_position_func(t):
+            # Slide in animation (first part)
+            if t < slide_duration:
+                progress = ease_func(t / slide_duration)
+                
+                if animation_type == "slide_left":
+                    # Start from left side, slide to center
+                    start_x = -img.w
+                    current_x = start_x + (final_x - start_x) * progress
+                    return (current_x, final_y)
+                    
+                elif animation_type == "slide_right":
+                    # Start from right side, slide to center
+                    start_x = video_w
+                    current_x = start_x + (final_x - start_x) * progress
+                    return (current_x, final_y)
+                    
+                else:  # fade only
+                    return (final_x, final_y)
+            
+            # Stay in position (middle part)
+            elif t < duration - slide_duration:
+                return (final_x, final_y)
+            
+            # Slide out animation (last part)
+            else:
+                exit_progress = ease_func((t - (duration - slide_duration)) / slide_duration)
+                
+                if animation_type == "slide_left":
+                    # Exit to left side
+                    end_x = -img.w
+                    current_x = final_x + (end_x - final_x) * exit_progress
+                    return (current_x, final_y)
+                    
+                elif animation_type == "slide_right":
+                    # Exit to right side
+                    end_x = video_w
+                    current_x = final_x + (end_x - final_x) * exit_progress
+                    return (current_x, final_y)
+                    
+                else:  # fade only
+                    return (final_x, final_y)
+        
+        # Apply position animation
+        img = img.set_position(make_position_func)
+        
+        # Add fade effects for smoother transitions
+        if duration > fade_duration * 2:
             img = img.fx(vfx.fadein, fade_duration)
             img = img.fx(vfx.fadeout, fade_duration)
-
+        
         return img
 
     except Exception as e:
         print(f"[ERROR] Could not load image {image_path}: {e}")
         return None
+
+
+def create_positioned_overlay(
+    image_path, duration, video_size, position, max_height=300, with_animation=True
+):
+    """Legacy function for backward compatibility - redirects to animated version."""
+    return create_animated_overlay(
+        image_path,
+        duration,
+        video_size,
+        position,
+        max_height,
+        animation_type="fade" if not with_animation else "slide_left",
+        animation_config={"slide_duration": 0.3, "fade_duration": 0.2}
+    )
 
 
 def overlaps_with_used_areas(pos, width, height, used_areas):

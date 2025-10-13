@@ -1,0 +1,41 @@
+{
+  "characters": {
+    "peter": {
+      "default_image": "peter.png",
+      "traits": ["clumsy", "foolish", "well-meaning"],
+      "image_options": [
+        {"descriptor": "angry peter", "filename": "peter_angry.png"},
+        {"descriptor": "peter in black suit", "filename": "peter_suit.png"},
+        {"descriptor": "peter wearing aluminum cap", "filename": "peter_cap.png"},
+        {"descriptor": "happy peter", "filename": "peter_happy.png"}
+      ]
+    },
+    "lois": {
+      "default_image": "lois.png",
+      "traits": ["patient", "assertive", "caring"],
+      "image_options": [
+        {"descriptor": "angry lois", "filename": "lois_angry.png"},
+        {"descriptor": "lois in red dress", "filename": "lois_dress_red.png"},
+        {"descriptor": "happy lois", "filename": "lois_happy.png"}
+      ]
+    },
+    "stewie": {
+      "default_image": "stewie.png",
+      "traits": ["genius", "evil", "sophisticated"],
+      "image_options": [
+        {"descriptor": "angry stewie", "filename": "stewie_angry.png"},
+        {"descriptor": "stewie with raygun", "filename": "stewie_raygun.png"},
+        {"descriptor": "happy stewie", "filename": "stewie_happy.png"}
+      ]
+    },
+    "brian": {
+      "default_image": "brian.png",
+      "traits": ["intellectual", "cynical", "philosophical"],
+      "image_options": [
+        {"descriptor": "angry brian", "filename": "brian_angry.png"},
+        {"descriptor": "brian with martini", "filename": "brian_martini.png"},
+        {"descriptor": "happy brian", "filename": "brian_happy.png"}
+      ]
+    }
+  }
+}

@@ -1,72 +1,54 @@
 import asyncio
 from typing import Optional
-import os
+from pathlib import Path
 
 from .script_service import generate_script
-from ..shared_services.tts_service import generate_tts
-from .assets_service.asset_service import (
-    fetch_background_video,
-    fetch_character_image,
-    fetch_infographic,
-)
+from ...tts_service import TTSService
+from ...assets_service import AssetsService
 from .project_manager import ProjectManager
 from .video_service.video_service import generate_video
 
 
-async def generate_family_guy_video(
-    topic: str, output_path: Optional[str] = None
-) -> str:
+async def generate_family_guy_video(topic: str, output_path: Optional[str] = None) -> str:
     """
     Generate a Family Guy style educational video for a given topic.
-    Each request creates a new project directory with its own assets and output.
-
-    Args:
-        topic: The educational topic to create a video about
-        output_path: Optional custom output path for the video. If not provided, uses a new project directory.
-
-    Returns:
-        str: Path to the generated video file
     """
-    # Create a new project directory with a shortened topic
-    short_topic = "peter_tech_video"  # Simplified topic name for this specific case
+    short_topic = "peter_tech_video"
     project_manager = ProjectManager()
     project_paths = project_manager.create_project(short_topic)
-    print(f"Created new project directory: {project_paths['project_dir']}")
+    print(f"📁 Project: {project_paths['project_dir']}")
 
-    # 1. Generate script
+    # 1️⃣ Generate script
     script = await generate_script(topic)
-    print(f"Generated script for topic: {topic}")
+    print(f"🧠 Generated script for topic: {topic}")
 
-    # 2. Fetch static assets (character images and background video) - these are fast
-    # Fetch all character images (these are cached/fast)
+    # 2️⃣ Initialize services
+    assets_service = AssetsService(project_dir=Path(project_paths["project_dir"]))
+    tts_service = TTSService()
+
+    # 3️⃣ Character images
     unique_characters = {d.character for d in script.dialogues}
     character_image_map = {}
-    for character in unique_characters:
-        key = character.lower().strip()
+    for char in unique_characters:
         try:
-            image_path = fetch_character_image(character)
-            character_image_map[key] = image_path
+            path = assets_service.get_character_image(char)
+            character_image_map[char.lower().strip()] = path
         except Exception as e:
-            print(f"⚠️ Character image missing for {character}: {e}")
+            print(f"⚠️ Missing image for {char}: {e}")
 
-    # Fetch background video (fast operation)
-    background_video_path = fetch_background_video()
+    # 4️⃣ Background gameplay video
+    background_video_path = assets_service.get_stock_gameplay_footage()
 
-    # 3. Run audio generation and infographic fetching in parallel
+    # 5️⃣ Generate TTS and infographics in parallel
     async def generate_all_audio():
         async def generate_single_audio(index, dialogue):
-            output_path = project_manager.get_audio_path(
-                project_paths["project_dir"], index
-            )
-            audio_path = generate_tts(
-                text=dialogue.text,
-                output_path=output_path,
-                character=dialogue.character.lower(),
-            )
+            out_path = project_manager.get_audio_path(project_paths["project_dir"], index)
+            audio_path = tts_service.generate_character_voice(dialogue.text, dialogue.character, out_path)
             return index, audio_path
 
-        tasks = [generate_single_audio(i, d) for i, d in enumerate(script.dialogues)]
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(
+            *[generate_single_audio(i, d) for i, d in enumerate(script.dialogues)]
+        )
         return [path for _, path in sorted(results)]
 
     async def fetch_all_infographics():
@@ -75,29 +57,35 @@ async def generate_family_guy_video(
             if not infographic_hint:
                 return index, None
 
+            # Generate consistent infographic path (don’t re-download)
             infographic_path = project_manager.get_infographic_path(
                 project_paths["project_dir"], index
             )
-            path = fetch_infographic(
-                topic=topic,
-                dialogue_text=dialogue.text,
-                output_filename=infographic_path,
-                infographic_hint=infographic_hint,
-            )
-            return index, path
 
-        info_tasks = [
-            fetch_single_infographic(i, d) for i, d in enumerate(script.dialogues)
-        ]
-        info_results = await asyncio.gather(*info_tasks)
-        return [path for _, path in sorted(info_results) if path is not None]
+            # Try using local if exists, otherwise fetch via AssetsService
+            if not Path(infographic_path).exists():
+                try:
+                    assets_service.get_assets_infographics(
+                        query=infographic_hint,
+                        output_path=Path(infographic_path),
+                    )
+                except Exception as e:
+                    print(f"⚠️ Failed to fetch infographic for {infographic_hint}: {e}")
+                    return index, None
 
-    # Run audio generation and infographic fetching simultaneously
+            return index, infographic_path
+
+        results = await asyncio.gather(
+            *[fetch_single_infographic(i, d) for i, d in enumerate(script.dialogues)]
+        )
+        return [path for _, path in sorted(results) if path is not None]
+
     audio_paths, infographic_paths = await asyncio.gather(
-        generate_all_audio(), fetch_all_infographics()
+        generate_all_audio(),
+        fetch_all_infographics(),
     )
 
-    # Generate final video
+    # 6️⃣ Compose final video
     output_video_path = output_path or project_paths["final_video"]
     generate_video(
         script=script,
@@ -108,6 +96,6 @@ async def generate_family_guy_video(
         infographic_images=infographic_paths,
     )
 
-    print(f"✅ Video generated at: {output_video_path}")
-    print(f"Project assets stored in: {project_paths['project_dir']}")
+    print(f"✅ Final video generated at: {output_video_path}")
+    print(f"🗂️ Assets stored in: {project_paths['project_dir']}")
     return output_video_path

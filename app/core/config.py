@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra environment variables
 
     # LLM config
     MAX_LLM_RETRIES: int = 3
@@ -59,7 +60,7 @@ class Settings(BaseSettings):
     CHARACTER_POSITIONS: Dict[str, str] = {
         "peter": "left",
         "stewie": "right",
-        "default": "center"
+        "default": "center",
     }
 
     # --- Text styling ---
@@ -81,11 +82,13 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra environment variables
 
     @classmethod
     def ensure_directories(cls):
         """Create all necessary directories if they don't exist"""
         import os
+
         directories = [
             cls.ASSETS_DIR,
             cls.CHARACTERS_DIR,

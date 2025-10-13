@@ -1,0 +1,50 @@
+{
+  "pixabay_api": {
+    "enabled": true,
+    "api_key": "",
+    "max_results": 5,
+    "image_type": "illustration,photo",
+    "safesearch": true,
+    "timeout": 10
+  },
+  "duckduckgo": {
+    "enabled": true,
+    "max_results": 5,
+    "delay_range": [1, 2],
+    "timeout": 15
+  },
+  "character_images": {
+    "enabled": true,
+    "characters_dir": "assets/characters",
+    "character_mappings": {
+      "peter griffin": "peter.png",
+      "peter": "peter.png",
+      "brian griffin": "brian.png",
+      "brian": "brian.png",
+      "stewie griffin": "stewie.png",
+      "stewie": "stewie.png",
+      "lois griffin": "lois.png",
+      "lois": "lois.png",
+      "chris griffin": "chris.png",
+      "chris": "chris.png"
+    }
+  },
+  "stock_videos": {
+    "enabled": true,
+    "videos_dir": "assets/videos/gameplay_bg_videos",
+    "supported_formats": ["mp4", "avi", "mov"]
+  },
+  "download_settings": {
+    "user_agent": "Mozilla/5.0 (compatible; AssetsBot/1.0)",
+    "min_file_size": 1000,
+    "max_file_size": 50000000,
+    "timeout": 15,
+    "retry_attempts": 3
+  },
+  "output_settings": {
+    "project_dir": "projects",
+    "create_subdirs": true,
+    "overwrite_existing": false
+  }
+}
+

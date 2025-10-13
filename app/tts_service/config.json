@@ -1,0 +1,51 @@
+{
+  "device": "auto",
+  "voice_samples_dir": "voices",
+  "outputs_dir": "outputs",
+  "chatterbox": {
+    "enabled": true,
+    "character_voices": {
+      "peter": "peter_voice.mp3",
+      "brian": "brian_voice.mp3",
+      "stewie": "stewie_voice.mp3"
+    },
+    "character_mappings": {
+      "peter": "peter",
+      "peter griffin": "peter",
+      "brian": "brian",
+      "brian griffin": "brian",
+      "stewie": "stewie",
+      "stewie griffin": "stewie"
+    }
+  },
+  "gtts": {
+    "enabled": true,
+    "lang": "en",
+    "slow": false
+  },
+  "tiktok_api": {
+    "enabled": false,
+    "session_id": "",
+    "default_voice": "en_us_002",
+    "voice_categories": {
+      "disney": ["ghost_face", "chewbacca", "c3po", "stitch", "stormtrooper", "rocket"],
+      "english": ["us_female1", "us_female2", "us_male1", "us_male2", "uk_male1"],
+      "europe": ["fr_male1", "de_female", "es_male"],
+      "asia": ["jp_female1", "kr_female", "id_female"],
+      "singing": ["alto", "tenor", "warmy_breeze"],
+      "special": ["narrator", "wacky", "peaceful"]
+    }
+  },
+  "subtitles": {
+    "enabled": true,
+    "subtitles_dir": "subtitles",
+    "max_chars": 10,
+    "default_settings": {
+      "font_size": 100,
+      "color": "white",
+      "stroke_color": "black",
+      "stroke_width": 5,
+      "position": "center,bottom"
+    }
+  }
+}
