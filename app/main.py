@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, List, Literal
+from typing import Literal
 
 from app.services.family_guy_video_gen.interface import generate_family_guy_video
 # from app.services.frequencies_video_gen.interface import generate_frequencies_video
@@ -42,6 +42,5 @@ if __name__ == "__main__":
             topic="Peter wonders if AI will someday rule the world. Stewie replies, 'They already do — have you seen TikTok’s algorithm?' Brian concludes, 'Relax, Peter. The real overlord is your screen-time app.'",
         )
         print("✅ Family Guy video generated:", video_path)
-
 
     asyncio.run(main())

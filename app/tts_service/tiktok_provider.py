@@ -12,7 +12,7 @@ from .tiktok_constants import (
     CHUNK_SIZE,
     DEFAULT_HEADERS,
 )
-from .text_preprocessor import TTSTextPreprocessor
+from .text_preprocessor import TTSPreprocessor as TTSTextPreprocessor
 
 
 class TikTokProvider:

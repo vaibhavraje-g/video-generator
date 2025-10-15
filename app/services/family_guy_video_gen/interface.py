@@ -1,6 +1,7 @@
 import asyncio
 from typing import Optional
 from pathlib import Path
+from collections import defaultdict
 
 from .script_service import generate_script
 from ...tts_service import TTSService
@@ -9,9 +10,12 @@ from .project_manager import ProjectManager
 from .video_service.video_service import generate_video
 
 
-async def generate_family_guy_video(topic: str, output_path: Optional[str] = None) -> str:
+async def generate_family_guy_video(
+    topic: str, output_path: Optional[str] = None
+) -> str:
     """
     Generate a Family Guy style educational video for a given topic.
+    Optimized: groups dialogues by character to minimize TTS model reloads.
     """
     short_topic = "peter_tech_video"
     project_manager = ProjectManager()
@@ -26,7 +30,7 @@ async def generate_family_guy_video(topic: str, output_path: Optional[str] = Non
     assets_service = AssetsService(project_dir=Path(project_paths["project_dir"]))
     tts_service = TTSService()
 
-    # 3️⃣ Character images
+    # 3️⃣ Load character images
     unique_characters = {d.character for d in script.dialogues}
     character_image_map = {}
     for char in unique_characters:
@@ -39,30 +43,43 @@ async def generate_family_guy_video(topic: str, output_path: Optional[str] = Non
     # 4️⃣ Background gameplay video
     background_video_path = assets_service.get_stock_gameplay_footage()
 
-    # 5️⃣ Generate TTS and infographics in parallel
+    # 5️⃣ Group dialogues by character
+    print("🎭 Grouping dialogues by character for efficient TTS synthesis...")
+    dialogues_by_character = defaultdict(list)
+    for i, d in enumerate(script.dialogues):
+        dialogues_by_character[d.character.lower().strip()].append((i, d))
+
+    # 6️⃣ Generate all TTS (async, per character)
     async def generate_all_audio():
-        async def generate_single_audio(index, dialogue):
-            out_path = project_manager.get_audio_path(project_paths["project_dir"], index)
-            audio_path = tts_service.generate_character_voice(dialogue.text, dialogue.character, out_path)
-            return index, audio_path
+        char_audio_results = {}
 
-        results = await asyncio.gather(
-            *[generate_single_audio(i, d) for i, d in enumerate(script.dialogues)]
-        )
-        return [path for _, path in sorted(results)]
+        for character, items in dialogues_by_character.items():
+            print(f"\n🎙️ Processing voice for: {character} ({len(items)} lines)")
+            sentences = [d.text for _, d in items]
 
+            audio_paths = await tts_service.generate_character_batch(
+                character=character,
+                texts=sentences,
+                output_dir=project_paths["project_dir"],
+            )
+
+            for (idx, _), path in zip(items, audio_paths):
+                char_audio_results[idx] = path
+
+        # Return in original dialogue order
+        return [char_audio_results[i] for i in range(len(script.dialogues))]
+
+    # 7️⃣ Generate infographics in parallel
     async def fetch_all_infographics():
         async def fetch_single_infographic(index, dialogue):
             infographic_hint = getattr(dialogue, "infographic", None)
             if not infographic_hint:
                 return index, None
 
-            # Generate consistent infographic path (don’t re-download)
             infographic_path = project_manager.get_infographic_path(
                 project_paths["project_dir"], index
             )
 
-            # Try using local if exists, otherwise fetch via AssetsService
             if not Path(infographic_path).exists():
                 try:
                     assets_service.get_assets_infographics(
@@ -80,12 +97,13 @@ async def generate_family_guy_video(topic: str, output_path: Optional[str] = Non
         )
         return [path for _, path in sorted(results) if path is not None]
 
+    # 8️⃣ Run TTS and infographics concurrently
     audio_paths, infographic_paths = await asyncio.gather(
         generate_all_audio(),
         fetch_all_infographics(),
     )
 
-    # 6️⃣ Compose final video
+    # 9️⃣ Compose final video
     output_video_path = output_path or project_paths["final_video"]
     generate_video(
         script=script,

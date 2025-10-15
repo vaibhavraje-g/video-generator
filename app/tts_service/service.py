@@ -7,6 +7,7 @@ from .gtts_provider import GTTSProvider
 from .tiktok_provider import TikTokProvider
 from .chatterbox_provider import ChatterboxProvider
 from .subtitle_service import SubtitleService
+from .text_preprocessor import TTSPreprocessor
 
 
 class TTSService:
@@ -43,11 +44,40 @@ class TTSService:
         subtitle_config = self.config.get_subtitle_config()
         self.subtitle_service = SubtitleService(subtitle_config)
 
+        # Smart preprocessing engine (gruut-backed)
+        self.preprocessor = TTSPreprocessor()
+
+    # --- Unified Generation API ---
+    def generate(
+        self,
+        text: str,
+        output_path: str,
+        provider: Literal["chatterbox", "gtts", "tiktok"] = "gtts",
+        **kwargs,
+    ) -> str:
+        # Preprocess text for natural speech
+        clean_text = self.preprocessor.clean(text)
+
+        if provider == "chatterbox":
+            character = kwargs.pop("character", None)
+            if not character:
+                raise ValueError("Character name required for chatterbox provider")
+            return self.generate_character_voice(
+                clean_text, character, output_path, **kwargs
+            )
+        elif provider == "tiktok":
+            return self.generate_tiktok_tts(clean_text, output_path, **kwargs)
+        else:
+            return self.generate_gtts(clean_text, output_path, **kwargs)
+
+    # --- Individual Provider Methods ---
     def generate_character_voice(
         self, text: str, character: str, output_path: str, **kwargs
     ) -> str:
         try:
-            return self.chatterbox_provider.generate(text, character, output_path, **kwargs)
+            return self.chatterbox_provider.generate(
+                text, character, output_path, **kwargs
+            )
         except Exception as e:
             print(f"WARNING Character TTS failed: {e}")
             print("Falling back to basic gTTS...")
@@ -61,7 +91,9 @@ class TTSService:
         lang: str = "en",
         slow: bool = False,
     ) -> str:
-        return self.gtts_provider.generate(text, output_path, voice=voice, lang=lang, slow=slow)
+        return self.gtts_provider.generate(
+            text, output_path, voice=voice, lang=lang, slow=slow
+        )
 
     def generate_tiktok_tts(
         self,
@@ -84,32 +116,7 @@ class TTSService:
             print("Falling back to gTTS...")
             return self.generate_gtts(text, output_path)
 
-    def generate(
-        self,
-        text: str,
-        output_path: str,
-        provider: Literal["chatterbox", "gtts", "tiktok"] = "gtts",
-        **kwargs,
-    ) -> str:
-        if provider == "chatterbox":
-            character = kwargs.pop("character", None)
-            if not character:
-                raise ValueError("Character name required for chatterbox provider")
-            return self.generate_character_voice(text, character, output_path, **kwargs)
-        elif provider == "tiktok":
-            return self.generate_tiktok_tts(text, output_path, **kwargs)
-        else:
-            return self.generate_gtts(text, output_path, **kwargs)
-
-    def generate_peter_voice(self, text: str, output_path: str, **kwargs) -> str:
-        return self.generate_character_voice(text, "peter", output_path, **kwargs)
-
-    def generate_brian_voice(self, text: str, output_path: str, **kwargs) -> str:
-        return self.generate_character_voice(text, "brian", output_path, **kwargs)
-
-    def generate_stewie_voice(self, text: str, output_path: str, **kwargs) -> str:
-        return self.generate_character_voice(text, "stewie", output_path, **kwargs)
-
+    # --- Subtitles ---
     def generate_subtitles(self, sentences: list, audio_clips: list) -> str:
         return self.subtitle_service.generate_subtitles(sentences, audio_clips)
 
@@ -139,15 +146,4 @@ class TTSService:
             threads,
         )
 
-    def create_subtitle_clip(
-        self,
-        subtitles_path: str,
-        font_path: str = None,
-        font_size: int = 100,
-        color: str = "white",
-        stroke_color: str = "black",
-        stroke_width: int = 5,
-    ):
-        return self.subtitle_service.create_subtitle_clip(
-            subtitles_path, font_path, font_size, color, stroke_color, stroke_width
-        )
+    # --- Utility Metho

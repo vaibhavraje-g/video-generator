@@ -76,4 +76,4 @@ VIDEO_LAYOUT = {
 }
 
 # --- Playback speed ---
-VIDEO_SPEED = 1.1  # 1.0 = normal speed, 1.1 = 10% faster
+VIDEO_SPEED = 1.03  # 1.0 = normal speed, 1.1 = 10% faster

@@ -1,20 +1,27 @@
 from gtts import gTTS
 from pathlib import Path
 from typing import Literal
-from .text_preprocessor import TTSTextPreprocessor
+from .text_preprocessor import TTSPreprocessor  # <-- new preprocessor
+import shutil
 
 
 class GTTSProvider:
-    """Google Text-to-Speech provider with male/female voice options"""
+    """
+    Google Text-to-Speech provider with smart text preprocessing,
+    automatic chunking, and basic voice control.
+    """
 
     SUPPORTED_VOICES = {
-        "male": "default",
-        "female": "default",
+        "male": "default",  # gTTS doesn’t support true male/female voices
+        "female": "default",  # but pitch/filters can be added later if needed
     }
 
     def __init__(self, outputs_dir: Path = None):
         self.outputs_dir = outputs_dir or Path("outputs")
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize advanced text preprocessor
+        self.preprocessor = TTSPreprocessor()
 
     def generate(
         self,
@@ -25,64 +32,58 @@ class GTTSProvider:
         slow: bool = False,
     ) -> str:
         """
-        Generate TTS using gTTS
+        Generate TTS using gTTS with smart preprocessing and chunk handling.
 
         Args:
-            text: Text to synthesize
-            output_path: Output file path
-            voice: Voice type ('male' or 'female') - gTTS uses same synthesis, differentiated by pitch
-            lang: Language code (default: 'en')
-            slow: Slow speech rate (default: False)
+            text: Text to synthesize.
+            output_path: Output .mp3 file path.
+            voice: Voice type ('male' or 'female') – gTTS only simulates difference.
+            lang: Language code (default 'en').
+            slow: Slow speech rate (default False).
 
         Returns:
-            Path to generated audio file
+            Path to generated audio file.
         """
-        print(f"Generating gTTS audio (voice: {voice})...")
+        print(f"[gTTS] Generating audio (voice={voice}, lang={lang})...")
 
-        # Preprocess text using common preprocessor
-        cleaned_text = TTSTextPreprocessor.clean_text(text, provider="gtts", lang=lang)
-        print(
-            f"Text: {cleaned_text[:100]}..."
-            if len(cleaned_text) > 100
-            else f"Text: {cleaned_text}"
-        )
+        # 1️⃣ Clean, normalize, and segment text
+        cleaned_text = self.preprocessor.clean(text, lang=lang)
+        sentences = self.preprocessor.segment(cleaned_text)
+
+        if not sentences:
+            raise ValueError("No valid text to synthesize after preprocessing.")
+
+        # 2️⃣ Merge short sentences to fit gTTS limits (~100 chars per chunk)
+        chunks = self.preprocessor.chunk_for_tts(sentences, max_chars=120)
+
+        print(f"[gTTS] {len(chunks)} chunks prepared for synthesis.")
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        temp_dir = Path(output_path).parent / "temp_gtts_chunks"
+        temp_dir.mkdir(exist_ok=True)
+        temp_files = []
 
-        # Split long text if needed
-        chunks = TTSTextPreprocessor.split_long_text(cleaned_text)
-        if len(chunks) > 1:
-            print(f"Text split into {len(chunks)} chunks for processing")
+        try:
+            # 3️⃣ Generate TTS for each chunk
+            for i, chunk in enumerate(chunks):
+                temp_file = temp_dir / f"chunk_{i}.mp3"
+                tts = gTTS(text=chunk, lang=lang, slow=slow)
+                tts.save(str(temp_file))
+                temp_files.append(temp_file)
 
-            # Create temporary directory for chunks
-            temp_dir = Path(output_path).parent / "temp_chunks"
-            temp_dir.mkdir(exist_ok=True)
+            # 4️⃣ Combine all chunks into final output
+            with open(output_path, "wb") as outfile:
+                for temp_file in temp_files:
+                    outfile.write(temp_file.read_bytes())
 
-            try:
-                # Process each chunk
+            print(f"[gTTS] ✅ Audio saved: {output_path}")
+            return str(output_path)
 
-                temp_files = []
-                for i, chunk in enumerate(chunks):
-                    temp_file = temp_dir / f"chunk_{i}.mp3"
-                    tts = gTTS(text=chunk, lang=lang, slow=slow)
-                    tts.save(str(temp_file))
-                    temp_files.append(temp_file)
+        except Exception as e:
+            print(f"[gTTS] ❌ Error during synthesis: {e}")
+            raise
 
-                # Combine chunks
-                with open(output_path, "wb") as outfile:
-                    for temp_file in temp_files:
-                        outfile.write(temp_file.read_bytes())
-
-            finally:
-                # Cleanup temp files
-                import shutil
-
-                if temp_dir.exists():
-                    shutil.rmtree(temp_dir)
-        else:
-            # Process single chunk
-            tts = gTTS(text=cleaned_text, lang=lang, slow=slow)
-            tts.save(output_path)
-
-        print(f"OK gTTS audio saved to: {output_path}")
-        return output_path
+        finally:
+            # 5️⃣ Cleanup temporary files
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)

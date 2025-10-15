@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from pathlib import Path
 from typing import Dict, Optional
-from .text_preprocessor import TTSTextPreprocessor
 
 
 class ChatterboxProvider:

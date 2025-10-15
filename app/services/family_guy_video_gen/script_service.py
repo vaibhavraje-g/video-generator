@@ -26,18 +26,22 @@ Generate a conversational script in strict JSON format for a vertical video
 where cartoon characters (like Family Guy) discuss and explain "{topic}".
 
 Requirements:
-- Start with a strong HOOK line to grab attention (e.g., Stewie mocking Peter, Peter making a fat joke, Brian sarcastically commenting, or a funny wordplay).
+- Start with a strong HOOK line (funny, sarcastic, or surprising).
 - Script length: 30–60 sec, 3–6 dialogue lines.
 - Each line must include `character` and `text`.
 - Include **Family Guy character traits**:
-    - Peter: silly, naive, sometimes overconfident, loves making absurd analogies.
-    - Stewie: sarcastic, cunning, often calls Peter “fat man,” obsessed with word domination and complex vocabulary.
-    - Brian: sarcastic, intellectual, sometimes dry humor.
-- **MANDATORY:** At least 1–3 dialogue lines MUST include an `infographic` field 
-  (short keyword or phrase describing a concept, chart, or diagram to visually support that line).
-  Example: {{"character": "Peter Griffin", "text": "AI is everywhere!", "infographic": "AI basics"}}
-- Keep it funny, engaging, and informative (TikTok/MrBeast style).
-- Reply ONLY with valid JSON. No commentary outside JSON.
+    - Peter: naive, overconfident, and says silly analogies.
+    - Stewie: sarcastic genius, calls Peter “fat man,” uses sharp wit.
+    - Brian: dry humor, intellectual tone.
+- Use **natural conversational phrasing** for TTS:
+    - Prefer commas, ellipses (...), or dashes (—) for pauses.
+    - Avoid repeated hyphens or letter stutters like "g-g-g" or "uh--".
+    - You can use fillers like “uh...”, “hmm,” “wait—what?” for realism.
+- Include 1–3 dialogue lines with an `infographic` field 
+  (short keyword or phrase for a supporting visual).
+  Example: {{"character": "Peter", "text": "AI is everywhere!", "infographic": "AI basics"}}
+- Make it sound natural when read aloud — no awkward breaks.
+- Reply ONLY with valid JSON, no commentary outside JSON.
 """
 
 

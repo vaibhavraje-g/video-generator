@@ -3,13 +3,14 @@
 import os
 import uuid
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from datetime import timedelta
-from moviepy.editor import AudioFileClip, TextClip, VideoFileClip, CompositeVideoClip
+from moviepy.editor import AudioFileClip, TextClip
 from moviepy.video.tools.subtitles import SubtitlesClip
 
 try:
     import srt_equalizer
+
     SRT_EQUALIZER_AVAILABLE = True
 except ImportError:
     SRT_EQUALIZER_AVAILABLE = False
@@ -32,12 +33,16 @@ class SubtitleService:
             hours, remainder = divmod(td.total_seconds(), 3600)
             minutes, seconds = divmod(remainder, 60)
             milliseconds = int((seconds - int(seconds)) * 1000)
-            return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
+            return (
+                f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{milliseconds:03}"
+            )
 
         start_time = 0.0
         subtitles = []
 
-        for i, (sentence, audio_clip) in enumerate(zip(sentences, audio_clips), start=1):
+        for i, (sentence, audio_clip) in enumerate(
+            zip(sentences, audio_clips), start=1
+        ):
             duration = audio_clip.duration
             end_time = start_time + duration
             entry = f"{i}\n{convert_to_srt_time_format(start_time)} --> {convert_to_srt_time_format(end_time)}\n{sentence}\n"
@@ -102,9 +107,9 @@ class SubtitleService:
                     color=color,
                     stroke_color=stroke_color,
                     stroke_width=stroke_width,
-                    method='caption',
+                    method="caption",
                     size=(1000, None),  # Constrain width
-                    align='center'
+                    align="center",
                 )
             except Exception as e:
                 print(f"⚠️ TextClip fallback for: {txt[:30]}... | Error: {e}")
@@ -112,8 +117,9 @@ class SubtitleService:
                     txt,
                     fontsize=font_size,
                     color=color,
-                    method='caption',
+                    method="caption",
                     size=(1000, None),
-                    align='center'
+                    align="center",
                 )
+
         return SubtitlesClip(subtitles_path, generator)

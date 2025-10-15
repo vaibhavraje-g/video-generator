@@ -1,8 +1,12 @@
 from moviepy.editor import TextClip, CompositeVideoClip, ColorClip
 from moviepy.config import change_settings
-change_settings({"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"})
+
+change_settings(
+    {"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"}
+)
 
 from .video_configs import TEXT_STYLE, VIDEO_LAYOUT
+
 
 def build_animated_text_overlay(dlg, duration, bg_segment, used_areas):
     """
@@ -29,7 +33,9 @@ def build_animated_text_overlay(dlg, duration, bg_segment, used_areas):
     current_line = []
     for word in words:
         test_line = " ".join(current_line + [word])
-        test_clip = TextClip(test_line, fontsize=fontsize, font=font_name, method="label")
+        test_clip = TextClip(
+            test_line, fontsize=fontsize, font=font_name, method="label"
+        )
         if test_clip.w <= max_line_width and len(test_line) <= max_chars_per_line:
             current_line.append(word)
         else:
@@ -45,41 +51,59 @@ def build_animated_text_overlay(dlg, duration, bg_segment, used_areas):
     clips = []
 
     # Center vertically
-    y_center = int(video_h * (VIDEO_LAYOUT["top_section"] + VIDEO_LAYOUT["middle_section"]/2))
+    y_center = int(
+        video_h * (VIDEO_LAYOUT["top_section"] + VIDEO_LAYOUT["middle_section"] / 2)
+    )
 
     word_idx = 0
     for line_words in lines:
         line_text = " ".join(line_words)
 
         # Center horizontally
-        temp_clip = TextClip(line_text, fontsize=fontsize, font=font_name, method="label")
+        temp_clip = TextClip(
+            line_text, fontsize=fontsize, font=font_name, method="label"
+        )
         line_x = (video_w - temp_clip.w) // 2
         line_y = y_center - temp_clip.h // 2
         temp_clip.close()
 
         for i, word in enumerate(line_words):
             pre_words = " ".join(line_words[:i])
-            pre_width = TextClip(pre_words, fontsize=fontsize, font=font_name, method="label").w if pre_words else 0
-            cur_word_clip = TextClip(word, fontsize=fontsize, font=font_name, method="label")
+            pre_width = (
+                TextClip(pre_words, fontsize=fontsize, font=font_name, method="label").w
+                if pre_words
+                else 0
+            )
+            cur_word_clip = TextClip(
+                word, fontsize=fontsize, font=font_name, method="label"
+            )
 
             # Highlight current word
-            highlight = ColorClip(
-                size=(cur_word_clip.w + pad*2, cur_word_clip.h + pad*2),
-                color=(255, 230, 100)
-            ).set_start(word_idx * word_duration).set_duration(word_duration)
+            highlight = (
+                ColorClip(
+                    size=(cur_word_clip.w + pad * 2, cur_word_clip.h + pad * 2),
+                    color=(255, 230, 100),
+                )
+                .set_start(word_idx * word_duration)
+                .set_duration(word_duration)
+            )
             highlight = highlight.set_position((line_x + pre_width - pad, line_y - pad))
             clips.append(highlight)
 
             # Base text (all words visible)
-            base_line_clip = TextClip(
-                line_text,
-                fontsize=fontsize,
-                font=font_name,
-                color=TEXT_STYLE["color"],
-                stroke_color=TEXT_STYLE["stroke_color"],
-                stroke_width=TEXT_STYLE["stroke_width"],
-                method="label"
-            ).set_start(word_idx * word_duration).set_duration(word_duration)
+            base_line_clip = (
+                TextClip(
+                    line_text,
+                    fontsize=fontsize,
+                    font=font_name,
+                    color=TEXT_STYLE["color"],
+                    stroke_color=TEXT_STYLE["stroke_color"],
+                    stroke_width=TEXT_STYLE["stroke_width"],
+                    method="label",
+                )
+                .set_start(word_idx * word_duration)
+                .set_duration(word_duration)
+            )
             base_line_clip = base_line_clip.set_position((line_x, line_y))
             clips.append(base_line_clip)
 
