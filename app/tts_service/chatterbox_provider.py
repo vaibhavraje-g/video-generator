@@ -3,10 +3,12 @@ import numpy as np
 import torch
 from pathlib import Path
 from typing import Dict, Optional
+from scipy.io import wavfile
+from .text_preprocessor import TTSPreprocessor  # <-- new smart preprocessor
 
 
 class ChatterboxProvider:
-    """ChatterboxTTS provider for character voice cloning"""
+    """ChatterboxTTS provider for character voice cloning with smart preprocessing"""
 
     _model_instance = None
 
@@ -19,14 +21,14 @@ class ChatterboxProvider:
         device: str = "auto",
     ):
         """
-        Initialize Chatterbox provider
+        Initialize Chatterbox provider.
 
         Args:
-            character_voices: Character to voice file mapping
-            character_mappings: Character name variations mapping
-            voice_samples_dir: Directory containing voice samples
-            outputs_dir: Output directory for generated files
-            device: Device to use ('cuda', 'cpu', or 'auto')
+            character_voices: Character to voice file mapping.
+            character_mappings: Character name variations mapping.
+            voice_samples_dir: Directory containing reference voice samples.
+            outputs_dir: Output directory for generated files.
+            device: Device to use ('cuda', 'cpu', or 'auto').
         """
         self.character_voices = character_voices
         self.character_mappings = character_mappings
@@ -35,23 +37,18 @@ class ChatterboxProvider:
         self.device = self._resolve_device(device)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
 
+        # ✅ Unified text preprocessor for all TTS
+        self.preprocessor = TTSPreprocessor()
+
     @staticmethod
     def _resolve_device(device: str) -> str:
-        """Resolve device configuration"""
+        """Resolve device configuration."""
         if device == "auto":
             return "cuda" if torch.cuda.is_available() else "cpu"
         return device
 
     def normalize_character_name(self, character: str) -> Optional[str]:
-        """
-        Normalize character name to match available voices
-
-        Args:
-            character: Character name (can be 'peter', 'Peter Griffin', etc.)
-
-        Returns:
-            Normalized character name or None if not found
-        """
+        """Normalize character name to match available voices."""
         if not character:
             return None
 
@@ -71,7 +68,7 @@ class ChatterboxProvider:
         return None
 
     def _set_seed(self, seed: int):
-        """Set random seed for reproducibility"""
+        """Set random seed for reproducibility."""
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
@@ -79,20 +76,18 @@ class ChatterboxProvider:
         np.random.seed(seed)
 
     def get_model(self):
-        """Get or load the ChatterboxTTS model (singleton pattern)"""
+        """Get or load the ChatterboxTTS model (singleton pattern)."""
         if ChatterboxProvider._model_instance is None:
             try:
                 from chatterbox.tts import ChatterboxTTS
             except ImportError:
                 raise ImportError(
-                    "ChatterboxTTS not installed. Install: pip install chatterbox-tts"
+                    "ChatterboxTTS not installed. Install via: pip install chatterbox-tts"
                 )
 
-            print(f"Loading ChatterboxTTS model on {self.device}...")
-            ChatterboxProvider._model_instance = ChatterboxTTS.from_pretrained(
-                self.device
-            )
-            print("OK Model loaded successfully!")
+            print(f"🔊 Loading ChatterboxTTS model on {self.device}...")
+            ChatterboxProvider._model_instance = ChatterboxTTS.from_pretrained(self.device)
+            print("✅ Model loaded successfully!")
 
         return ChatterboxProvider._model_instance
 
@@ -109,83 +104,43 @@ class ChatterboxProvider:
         top_p: float = 1.0,
         repetition_penalty: float = 1.2,
     ) -> str:
-        """Generate TTS with character voice using ChatterboxTTS"""
+        """Generate TTS with character voice using ChatterboxTTS."""
 
         normalized_char = self.normalize_character_name(character)
 
         if not normalized_char:
             raise ValueError(
-                f"Unknown character: {character}. Available: {list(self.character_voices.keys())}"
+                f"❌ Unknown character: {character}. Available voices: {list(self.character_voices.keys())}"
             )
 
-        audio_prompt_path = (
-            self.voice_samples_dir / self.character_voices[normalized_char]
-        )
+        audio_prompt_path = self.voice_samples_dir / self.character_voices[normalized_char]
 
         if not audio_prompt_path.exists():
-            raise FileNotFoundError(f"Voice sample not found: {audio_prompt_path}")
+            raise FileNotFoundError(f"🎙️ Voice sample not found: {audio_prompt_path}")
 
-        print(f"Generating TTS for character: {character} → {normalized_char}")
+        print(f"🧠 Generating TTS for character: {character} → {normalized_char}")
 
-        # Preprocess text using common preprocessor
-        cleaned_text = TTSTextPreprocessor.clean_text(
-            text,
-            provider="chatterbox",
-            preserve_case=True,  # Preserve case for better emphasis
-        )
-        print(
-            f"📝 Text: {cleaned_text[:100]}..."
-            if len(cleaned_text) > 100
-            else f"📝 Text: {cleaned_text}"
-        )
-        print(f"🎤 Using reference: {audio_prompt_path}")
+        # ✅ Step 1: Preprocess and clean the text
+        cleaned_text = self.preprocessor.clean(text)
+        sentences = self.preprocessor.segment(cleaned_text)
+        chunks = self.preprocessor.chunk_for_tts(sentences, max_chars=160)
+
+        print(f"📜 Text cleaned and split into {len(chunks)} chunk(s).")
+        print(f"🎤 Using reference voice: {audio_prompt_path}")
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
         model = self.get_model()
 
-        if seed != 0:
+        if seed:
             self._set_seed(seed)
 
-        # Split long text if needed
-        chunks = TTSTextPreprocessor.split_long_text(cleaned_text)
-        if len(chunks) > 1:
-            print(f"Text split into {len(chunks)} chunks for processing")
-
-        import scipy.io.wavfile as wavfile
-        import numpy as np
-
-        if len(chunks) > 1:
-            # Process each chunk and combine
-            combined_audio = []
-
-            for i, chunk in enumerate(chunks):
-                print(f"Processing chunk {i + 1}/{len(chunks)}...")
-                wav = model.generate(
-                    chunk,
-                    audio_prompt_path=str(audio_prompt_path),
-                    exaggeration=exaggeration,
-                    temperature=temperature,
-                    cfg_weight=cfg_weight,
-                    min_p=min_p,
-                    top_p=top_p,
-                    repetition_penalty=repetition_penalty,
-                )
-                combined_audio.append(wav.squeeze(0).numpy())
-
-            # Add small pause between chunks
-            pause_samples = int(0.3 * model.sr)  # 0.3 second pause
-            pause = np.zeros(pause_samples)
-
-            # Combine all chunks with pauses
-            final_audio = np.concatenate(
-                [np.concatenate([chunk, pause]) for chunk in combined_audio]
-            )
-            wavfile.write(output_path, model.sr, final_audio)
-        else:
-            # Generate audio for single chunk
+        # ✅ Step 2: Generate and combine chunks
+        combined_audio = []
+        for i, chunk in enumerate(chunks):
+            print(f"🎧 Synthesizing chunk {i + 1}/{len(chunks)} ({len(chunk)} chars)...")
             wav = model.generate(
-                cleaned_text,
+                chunk,
                 audio_prompt_path=str(audio_prompt_path),
                 exaggeration=exaggeration,
                 temperature=temperature,
@@ -194,7 +149,17 @@ class ChatterboxProvider:
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
             )
-            wavfile.write(output_path, model.sr, wav.squeeze(0).numpy())
+            combined_audio.append(wav.squeeze(0).numpy())
 
-        print(f"OK Character TTS saved to: {output_path}")
-        return output_path
+        # ✅ Step 3: Add natural pause between chunks
+        pause_samples = int(0.25 * model.sr)  # 250ms pause
+        pause = np.zeros(pause_samples)
+
+        final_audio = np.concatenate(
+            [np.concatenate([chunk, pause]) for chunk in combined_audio]
+        )
+
+        wavfile.write(output_path, model.sr, final_audio)
+        print(f"✅ Character TTS saved: {output_path}")
+
+        return str(output_path)

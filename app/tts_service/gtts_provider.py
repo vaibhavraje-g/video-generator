@@ -12,7 +12,7 @@ class GTTSProvider:
     """
 
     SUPPORTED_VOICES = {
-        "male": "default",  # gTTS doesn’t support true male/female voices
+        "male": "default",    # gTTS doesn’t support true male/female voices
         "female": "default",  # but pitch/filters can be added later if needed
     }
 
