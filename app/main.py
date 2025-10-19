@@ -39,7 +39,7 @@ if __name__ == "__main__":
         # Example 1: Generate a Family Guy style educational video
         video_path = await generate_video(
             video_type="family_guy",
-            topic="Peter wonders if AI will someday rule the world. Stewie replies, 'They already do — have you seen TikTok’s algorithm?' Brian concludes, 'Relax, Peter. The real overlord is your screen-time app.'",
+            topic="Peter tries to go viral on TikTok, but Stewie points out, 'Your dance moves are a biohazard.' Brian suggests, 'Maybe just stick to reviewing AI tools.' Meanwhile, Meg secretly becomes the influencer everyone talks about.'",
         )
         print("✅ Family Guy video generated:", video_path)
 

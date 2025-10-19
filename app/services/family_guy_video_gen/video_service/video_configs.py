@@ -49,10 +49,17 @@ ANIMATION_CONFIG = {
 
 # --- Infographic Overlay Config ---
 INFOGRAPHIC_CONFIG = {
+    # The infographic will be constrained to these widths/heights.
+    # Large images will be downscaled to fit in this box,
+    # small images will be gently upscaled (until the upscale_limit).
     "max_height": 300,
     "max_width": 500,
     "top_margin": 80,
     "animation": "slide_right",
+    # how much to upscale small images (max)
+    "upscale_limit": 1.25,
+    # if image is smaller than this fraction of max size, apply gentle upscaling
+    "upscale_threshold_frac": 0.8,
 }
 
 # --- Character Image Overlay Config ---
@@ -70,6 +77,8 @@ VIDEO_LAYOUT = {
     "output_height": 1080,
     "output_width": 608,
     "fps": 24,
+    # sections define vertical thirds roughly: top/middle/bottom fractions
+    # top_section is where infographics should be visually centered.
     "top_section": 0.33,
     "middle_section": 0.34,
     "bottom_section": 0.33,

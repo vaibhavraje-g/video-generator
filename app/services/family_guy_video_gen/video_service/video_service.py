@@ -1,17 +1,27 @@
+"""
+Main video generation orchestrator.
+Uses:
+ - text overlay (text_overlay.build_animated_text_overlay)
+ - image overlay service (image_overlay_service.build_image_overlays)
+This file is a cleaned-up version of your earlier service; it imports the modular overlay builders.
+"""
+
 import os
 import tempfile
 from multiprocessing import cpu_count
-from moviepy.editor import (
-    VideoFileClip,
-    CompositeVideoClip,
-    AudioFileClip,
-    concatenate_videoclips,
-    vfx,
-)
+from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip, vfx
+
+from .video_configs import INFOGRAPHIC_CONFIG, CHARACTER_CONFIG, VIDEO_LAYOUT
+
 from moviepy.config import change_settings
 from PIL import Image
 
-# Ensure ImageMagick path is configured
+from .video_utils import crop_to_vertical
+from .text_overlay import build_animated_text_overlay
+from .image_overlay import build_image_overlays
+from .video_configs import VIDEO_LAYOUT, VIDEO_SPEED
+
+# Ensure ImageMagick path is configured (if needed elsewhere)
 change_settings(
     {"IMAGEMAGICK_BINARY": r"C:/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe"}
 )
@@ -19,85 +29,13 @@ change_settings(
 if not hasattr(Image, "ANTIALIAS"):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
 
-from .video_utils import crop_to_vertical, create_animated_overlay
-from .text_overlay import build_animated_text_overlay
-from .video_configs import (
-    VIDEO_LAYOUT,
-    CHARACTER_CONFIG,
-    INFOGRAPHIC_CONFIG,
-    ANIMATION_CONFIG,
-    VIDEO_SPEED,
-)
-
-# ---------------------------------------------------------------
-# --- Utility Functions ---
-# ---------------------------------------------------------------
-
 
 def clean_segment(segment):
-    """Placeholder for cleaning (black frame trim, etc)."""
+    """Placeholder for cleaning (e.g., trim black frames). Keep simple for now."""
     try:
         return segment
     except Exception:
         return segment
-
-
-def build_overlays_for_dialogue(
-    dlg, duration, bg_segment, i, char_images, infographic_map
-):
-    """Build all overlays (character, text, infographics) for one dialogue."""
-    overlay_clips = [bg_segment]
-    video_w, video_h = bg_segment.size
-    used_areas = []
-
-    # Infographic top
-    info_img = infographic_map.get(i)
-    if info_img and os.path.exists(info_img):
-        info_clip = create_animated_overlay(
-            info_img,
-            duration,
-            (video_w, video_h),
-            final_position=(
-                (video_w - INFOGRAPHIC_CONFIG["max_width"]) // 2,
-                INFOGRAPHIC_CONFIG["top_margin"],
-            ),
-            max_height=INFOGRAPHIC_CONFIG["max_height"],
-            animation_type="slide_right",
-            animation_config=ANIMATION_CONFIG,
-        )
-        if info_clip:
-            overlay_clips.append(info_clip)
-
-    # Animated text
-    text_overlays = build_animated_text_overlay(dlg, duration, bg_segment, used_areas)
-    overlay_clips.extend(text_overlays)
-
-    # Character bottom
-    char_img = char_images.get(dlg.character.lower().strip()) if char_images else None
-    if char_img and os.path.exists(char_img):
-        char_clip = create_animated_overlay(
-            char_img,
-            duration,
-            (video_w, video_h),
-            final_position=(
-                (video_w - CHARACTER_CONFIG["max_width"]) // 2,
-                video_h
-                - CHARACTER_CONFIG["max_height"]
-                - CHARACTER_CONFIG["bottom_margin"],
-            ),
-            max_height=CHARACTER_CONFIG["max_height"],
-            animation_type="slide_left",
-            animation_config=ANIMATION_CONFIG,
-        )
-        if char_clip:
-            overlay_clips.append(char_clip)
-
-    return overlay_clips
-
-
-# ---------------------------------------------------------------
-# --- Main Video Generation Service ---
-# ---------------------------------------------------------------
 
 
 def generate_video(
@@ -108,18 +46,24 @@ def generate_video(
     char_images=None,
     infographic_images=None,
 ):
+    """
+    Entry point for generating the final video.
+    - script: object with dialogues list (each dlg has .text and .character)
+    - tts_files: list of paths to audio files (parallel to dialogues)
+    - bg_video: path to background video
+    - char_images: dict mapping character_key -> image_path
+    - infographic_images: list of infographic image paths (index -> file)
+    """
     clips_to_close, temp_files = [], []
 
     infographic_map = {i: path for i, path in enumerate(infographic_images or [])}
 
     try:
-        # Load background video efficiently
-        base_clip = VideoFileClip(
-            bg_video, target_resolution=(VIDEO_LAYOUT["output_height"], None)
-        )
+        # Load background video efficiently; targeting output height keeps scale consistent
+        base_clip = VideoFileClip(bg_video, target_resolution=(VIDEO_LAYOUT["output_height"], None))
         clips_to_close.append(base_clip)
 
-        # Crop to vertical orientation if needed
+        # Ensure vertical crop if needed
         base_clip = crop_to_vertical(
             base_clip,
             VIDEO_LAYOUT["target_aspect_ratio"],
@@ -128,12 +72,10 @@ def generate_video(
         )
 
         segments = []
-        current_time = 0
+        current_time = 0.0
 
-        # ---------------------------------------------------
-        # Optionally parallelize this loop if generating many segments
-        # ---------------------------------------------------
         for i, dlg in enumerate(script.dialogues):
+            # ensure matching audio
             if i >= len(tts_files) or not os.path.exists(tts_files[i]):
                 print(f"[WARN] Missing audio for dialogue {i}, skipping.")
                 continue
@@ -144,51 +86,62 @@ def generate_video(
             if duration < 0.2:
                 continue
 
-            # Extract segment (wrap-around if needed)
+            # Choose background segment slice (wrap-around allowed)
             if current_time + duration <= base_clip.duration:
                 bg_segment = base_clip.subclip(current_time, current_time + duration)
             else:
+                # if we run out of background video, restart from 0 to fill duration
                 bg_segment = base_clip.subclip(0, min(duration, base_clip.duration))
-                current_time = 0
+                current_time = 0.0
 
             clips_to_close.append(bg_segment)
 
-            # Build overlays
-            overlay_clips = build_overlays_for_dialogue(
-                dlg, duration, bg_segment, i, char_images, infographic_map
-            )
-            segment = CompositeVideoClip(overlay_clips, size=bg_segment.size).set_audio(
-                audio
-            )
+            # Build overlays: images first (top + character), then text overlays
+            image_overlays = build_image_overlays(dlg, duration, bg_segment, i, char_images, infographic_map)
+            text_overlays = build_animated_text_overlay(dlg, duration, bg_segment, used_areas=[])
 
-            # Clean if needed
+            # Compose overlay list: background + image overlays + text overlays
+            overlay_clips = [bg_segment]
+            if image_overlays:
+                # image_overlays may be a list of clips (or single clip) — normalize
+                if isinstance(image_overlays, list):
+                    overlay_clips.extend(image_overlays)
+                else:
+                    overlay_clips.append(image_overlays)
+            if text_overlays:
+                overlay_clips.extend(text_overlays)
+
+            # Composite and set audio
+            segment = CompositeVideoClip(overlay_clips, size=bg_segment.size).set_audio(audio)
+
+            # Optional segment cleaning
             segment = clean_segment(segment)
+
             segments.append(segment)
             clips_to_close.append(segment)
 
+            # advance background time; wrap if hitting end
             current_time += duration
             if current_time >= base_clip.duration:
-                current_time = 0
+                current_time = 0.0
 
         if not segments:
             print("[ERROR] No segments generated.")
             return None
 
-        # Merge segments
+        # Concatenate segments; method=compose keeps sizes consistent
         final = concatenate_videoclips(segments, method="compose")
 
-        # Apply video speed factor
+        # Apply playback speed if configured
         if VIDEO_SPEED != 1.0:
             final = final.fx(vfx.speedx, VIDEO_SPEED)
 
         clips_to_close.append(final)
 
-        # ---------------------------------------------------
-        # Optimized ffmpeg export
-        # ---------------------------------------------------
+        # Export to a temp file first for safe atomic replace
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
-            temp_output = temp_file.name
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tf:
+            temp_output = tf.name
             temp_files.append(temp_output)
 
         final.write_videofile(
@@ -196,45 +149,42 @@ def generate_video(
             fps=VIDEO_LAYOUT["fps"],
             codec="libx264",
             audio_codec="aac",
-            preset="fast",  # faster encode
-            threads=cpu_count() // 2,  # use all CPU cores
-            ffmpeg_params=[
-                "-crf",
-                "22",
-                "-movflags",
-                "+faststart",
-            ],  # faster start playback
+            preset="fast",
+            threads=max(1, cpu_count() // 2),
+            ffmpeg_params=["-crf", "22", "-movflags", "+faststart"],
             temp_audiofile="temp-audio.m4a",
             remove_temp=True,
             logger=None,
             verbose=False,
         )
 
+        # Move temp output to final path
         if os.path.exists(temp_output) and os.path.getsize(temp_output) > 0:
             if os.path.exists(output_path):
                 os.remove(output_path)
             os.rename(temp_output, output_path)
             temp_files.remove(temp_output)
         else:
-            print(f"[ERROR] Generated video missing: {temp_output}")
+            print(f"[ERROR] Generated video missing or zero-length: {temp_output}")
             return None
 
         print(f"[INFO] ✅ Video generated successfully at {output_path}")
         return output_path
 
-    except Exception as e:
-        print(f"[ERROR] generating video: {e}")
+    except Exception as exc:
+        print(f"[ERROR] generating video: {exc}")
         return None
 
     finally:
-        # Cleanup all MoviePy clips to free RAM
+        # Clean up MoviePy clips (close in reverse order)
         for clip in reversed(clips_to_close):
             try:
                 clip.close()
             except Exception:
                 pass
-        for temp_file in temp_files:
+        # remove any leftover temp files
+        for fpath in temp_files:
             try:
-                os.remove(temp_file)
+                os.remove(fpath)
             except Exception:
                 pass
