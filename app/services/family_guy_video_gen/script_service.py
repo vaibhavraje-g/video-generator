@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel
-from app.llm_service.llm_service import invoke_llm_with_prompt
+from app.shared_services.llm_service.llm_service import invoke_llm_with_prompt
 
 
 # --- Schema ---
@@ -27,7 +27,7 @@ where cartoon characters (like Family Guy) discuss and explain "{topic}".
 
 Requirements:
 - Start with a strong HOOK line (funny, sarcastic, or surprising).
-- Script length: 30–60 sec, 3–6 dialogue lines.
+- Script length: 50–60 sec, 5–8 dialogue lines.
 - Each line must include `character` and `text`.
 - Include **Family Guy character traits**:
     - Peter: naive, overconfident, and says silly analogies.
@@ -37,6 +37,7 @@ Requirements:
     - Prefer commas, ellipses (...), or dashes (—) for pauses.
     - Avoid repeated hyphens or letter stutters like "g-g-g" or "uh--".
     - You can use fillers like “uh...”, “hmm,” “wait—what?” for realism.
+- Use only the following characters: Peter, Stewie, Brian.
 - Include 1–3 dialogue lines with an `infographic` field 
   (short keyword or phrase for a supporting visual).
   Example: {{"character": "Peter", "text": "AI is everywhere!", "infographic": "AI basics"}}

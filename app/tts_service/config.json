@@ -5,9 +5,9 @@
   "chatterbox": {
     "enabled": true,
     "character_voices": {
-      "peter": "peter_voice.mp3",
-      "brian": "brian_voice.mp3",
-      "stewie": "stewie_voice.mp3"
+      "peter": "peter_voice.wav",
+      "brian": "brian_voice.wav",
+      "stewie": "stewie_voice.wav"
     },
     "character_mappings": {
       "peter": "peter",

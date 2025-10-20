@@ -7,7 +7,7 @@ import asyncio
 from .config import TTSConfig
 from .gtts_provider import GTTSProvider
 from .tiktok_provider import TikTokProvider
-from .chatterbox_provider import ChatterboxProvider
+from .chatterbox_provider import ChatterboxProvider  # now HTTP-based
 from .subtitle_service import SubtitleService
 from .text_preprocessor import TTSPreprocessor
 
@@ -15,7 +15,7 @@ from .text_preprocessor import TTSPreprocessor
 class TTSService:
     """
     Unified TTS Service supporting multiple providers:
-    - ChatterboxTTS for character voice cloning
+    - ChatterboxTTS (via remote HTTP API) for character voice cloning
     - gTTS for basic TTS with voice options
     - TikTok API for free high-quality TTS
     - Local subtitle generation
@@ -31,13 +31,16 @@ class TTSService:
         self.tiktok_provider = TikTokProvider(self.config.get_tiktok_config())
         self.gtts_provider = GTTSProvider(outputs_dir=self.outputs_dir)
 
+        # 🔁 Updated: Initialize HTTP-based Chatterbox provider
         chatterbox_config = self.config.get_chatterbox_config()
+        base_url = chatterbox_config.get("base_url", "http://localhost:8004")
+
         self.chatterbox_provider = ChatterboxProvider(
             character_voices=chatterbox_config.get("character_voices", {}),
             character_mappings=chatterbox_config.get("character_mappings", {}),
-            voice_samples_dir=self.voice_samples_dir,
+            voice_samples_dir=self.voice_samples_dir,  # still used if auto-uploading
             outputs_dir=self.outputs_dir,
-            device=self.config.get_device(),
+            base_url=base_url,  # ✅ new parameter
         )
 
         self.subtitle_service = SubtitleService(self.config.get_subtitle_config())
@@ -68,7 +71,7 @@ class TTSService:
         try:
             return self.chatterbox_provider.generate(text, character, output_path, **kwargs)
         except Exception as e:
-            print(f"WARNING Character TTS failed: {e}")
+            print(f"WARNING: Character TTS failed: {e}")
             print("Falling back to gTTS...")
             return self.generate_gtts(text, output_path)
 
@@ -85,7 +88,7 @@ class TTSService:
                 **kwargs,
             )
         except Exception as e:
-            print(f"WARNING TikTok TTS failed: {e}")
+            print(f"WARNING: TikTok TTS failed: {e}")
             print("Falling back to gTTS...")
             return self.generate_gtts(text, output_path)
 
@@ -110,33 +113,41 @@ class TTSService:
             video_path, subtitles_path, output_path,
             position, font_path, font_size, color, stroke_color, stroke_width, threads
         )
-    
-        # inside TTSService
+
     async def generate_character_batch(self, character: str, texts: list[str], output_dir: str):
         """
         Efficiently generate TTS for multiple lines of one character.
-        Uses Chatterbox voice cloning only once.
+        Uses Chatterbox voice cloning only once (via HTTP).
         """
         from pathlib import Path
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use Chatterbox provider directly
         provider = self.chatterbox_provider
-        norm_char = provider.normalize_character_name(character)
-
         audio_paths = []
+
+        # Prefer .wav, fallback to .mp3
+        wav_file = Path(self.voice_samples_dir) / f"{character}_voice.wav"
+        mp3_file = Path(self.voice_samples_dir) / f"{character}_voice.mp3"
+
+        if wav_file.exists():
+            local_voice_file = wav_file
+        elif mp3_file.exists():
+            local_voice_file = mp3_file
+        else:
+            raise FileNotFoundError(f"No voice file found for character '{character}'")
+
         for i, text in enumerate(texts):
             output_path = output_dir / f"{character}_{i}.wav"
-            # This could be sync; wrap in asyncio.to_thread to avoid blocking
+
             audio_path = await asyncio.to_thread(
                 provider.generate,
                 text=text,
-                character=character,
-                output_path=str(output_path)
+                reference_audio_path=str(local_voice_file),
+                output_path=str(output_path),
             )
+
             audio_paths.append(str(output_path))
 
         return audio_paths
-

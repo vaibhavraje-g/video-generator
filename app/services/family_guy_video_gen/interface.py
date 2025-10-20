@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from .script_service import generate_script
 from ...tts_service import TTSService
-from ...assets_service import AssetsService
+from app.assets_service import AssetsService
 from .project_manager import ProjectManager
 from .video_service.video_service import generate_video
 

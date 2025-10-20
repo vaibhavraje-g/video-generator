@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Family Guy Video Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 700px;
+            width: 100%;
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea::placeholder {
+            color: #999;
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        button.loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        #status {
+            margin: 20px 0;
+            min-height: 30px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: #555;
+        }
+
+        .video-container {
+            display: none;
+            margin-top: 30px;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .video-container.show {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        video {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin-bottom: 15px;
+        }
+
+        .download-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(39, 174, 96, 0.4);
+        }
+
+        .download-btn:active {
+            transform: translateY(0);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-bar.show {
+            display: block;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            button {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Generate a Family Guy-Style Video</h1>
+        <textarea id="topic" placeholder="Enter your scene idea... (e.g., 'Peter fights a giant chicken')"></textarea>
+        <button id="generate">Generate Video</button>
+        
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div class="video-container" id="videoContainer">
+            <video id="preview" controls></video>
+            <button class="download-btn" id="downloadBtn">
+                <span>📥</span>
+                <span>Download Video</span>
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        let currentVideoUrl = null;
+
+        document.getElementById('generate').addEventListener('click', async () => {
+            const topic = document.getElementById('topic').value.trim();
+            const status = document.getElementById('status');
+            const video = document.getElementById('preview');
+            const videoContainer = document.getElementById('videoContainer');
+            const generateBtn = document.getElementById('generate');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+
+            if (!topic) {
+                status.textContent = '⚠️ Please enter a topic.';
+                status.style.color = '#e74c3c';
+                return;
+            }
+
+            // Reset UI
+            videoContainer.classList.remove('show');
+            progressBar.classList.add('show');
+            progressFill.style.width = '0%';
+            status.textContent = '🎬 Generating your Family Guy video... This may take a minute.';
+            status.style.color = '#3498db';
+            generateBtn.disabled = true;
+            generateBtn.classList.add('loading');
+
+            // Simulate progress (since we don't have real progress updates)
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                if (progress < 90) {
+                    progress += Math.random() * 15;
+                    progressFill.style.width = Math.min(progress, 90) + '%';
+                }
+            }, 500);
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_type: 'family_guy', topic })
+                });
+
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    status.textContent = '✅ Video generated successfully!';
+                    status.style.color = '#27ae60';
+                    
+                    // Store the video URL
+                    currentVideoUrl = result.video_url;
+                    
+                    // Set video source and show container
+                    video.src = result.video_url;
+                    video.load();
+                    videoContainer.classList.add('show');
+                    
+                    // Hide progress bar after a delay
+                    setTimeout(() => {
+                        progressBar.classList.remove('show');
+                    }, 1000);
+                } else {
+                    status.textContent = `❌ Error: ${result.detail || 'Unknown error'}`;
+                    status.style.color = '#e74c3c';
+                    progressBar.classList.remove('show');
+                }
+            } catch (err) {
+                clearInterval(progressInterval);
+                status.textContent = `❌ Network error: ${err.message}`;
+                status.style.color = '#e74c3c';
+                progressBar.classList.remove('show');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.classList.remove('loading');
+            }
+        });
+
+        // Download button handler
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            if (!currentVideoUrl) return;
+
+            try {
+                const status = document.getElementById('status');
+                status.textContent = '📥 Downloading...';
+                status.style.color = '#3498db';
+
+                // Fetch the video file
+                const response = await fetch(currentVideoUrl);
+                const blob = await response.blob();
+                
+                // Create a download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `family-guy-video-${Date.now()}.mp4`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                status.textContent = '✅ Download started!';
+                status.style.color = '#27ae60';
+                
+                setTimeout(() => {
+                    status.textContent = '✅ Video generated successfully!';
+                }, 2000);
+            } catch (err) {
+                const status = document.getElementById('status');
+                status.textContent = `❌ Download failed: ${err.message}`;
+                status.style.color = '#e74c3c';
+            }
+        });
+
+        // Allow Enter key to submit (Shift+Enter for new line)
+        document.getElementById('topic').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('generate').click();
+            }
+        });
+    </script>
+</body>
+</html>

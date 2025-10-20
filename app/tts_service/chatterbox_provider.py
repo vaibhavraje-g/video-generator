@@ -1,165 +1,142 @@
-import random
-import numpy as np
-import torch
+#!/usr/bin/env python3
+"""
+Standalone Chatterbox TTS client.
+Generates speech by calling a remote Chatterbox TTS web service.
+Supports voice cloning, custom reference uploads, and multilingual TTS.
+"""
+
+import requests
+import json
 from pathlib import Path
-from typing import Dict, Optional
-from scipy.io import wavfile
-from .text_preprocessor import TTSPreprocessor  # <-- new smart preprocessor
+from typing import Optional, Union
 
 
-class ChatterboxProvider:
-    """ChatterboxTTS provider for character voice cloning with smart preprocessing"""
-
-    _model_instance = None
-
-    def __init__(
-        self,
-        character_voices: Dict[str, str],
-        character_mappings: Dict[str, str],
-        voice_samples_dir: Path,
-        outputs_dir: Path,
-        device: str = "auto",
-    ):
+class ChatterboxClient:
+    def __init__(self, base_url: str = "http://localhost:8004", **kwargs):
         """
-        Initialize Chatterbox provider.
+        Initialize ChatterboxClient.
 
         Args:
-            character_voices: Character to voice file mapping.
-            character_mappings: Character name variations mapping.
-            voice_samples_dir: Directory containing reference voice samples.
-            outputs_dir: Output directory for generated files.
-            device: Device to use ('cuda', 'cpu', or 'auto').
+            base_url: Base URL of the Chatterbox TTS server.
+            **kwargs: Extra arguments for compatibility (e.g., character_voices, api_key, etc.)
         """
-        self.character_voices = character_voices
-        self.character_mappings = character_mappings
-        self.voice_samples_dir = Path(voice_samples_dir)
-        self.outputs_dir = Path(outputs_dir)
-        self.device = self._resolve_device(device)
-        self.outputs_dir.mkdir(parents=True, exist_ok=True)
+        self.base_url = base_url.rstrip("/")
 
-        # ✅ Unified text preprocessor for all TTS
-        self.preprocessor = TTSPreprocessor()
+        # store optional mappings or metadata (for backward compatibility)
+        self.character_voices = kwargs.get("character_voices", {})
+        self.character_mappings = kwargs.get("character_mappings", {})
+        self.voice_samples_dir = kwargs.get("voice_samples_dir")
+        self.outputs_dir = kwargs.get("outputs_dir")
 
-    @staticmethod
-    def _resolve_device(device: str) -> str:
-        """Resolve device configuration."""
-        if device == "auto":
-            return "cuda" if torch.cuda.is_available() else "cpu"
-        return device
+    def upload_reference_audio(self, filepath: Union[str, Path]) -> str:
+        """
+        Upload a reference audio file (WAV) to the server.
+        Returns the filename as stored on the server (e.g., 'my_voice.wav').
+        """
+        filepath = Path(filepath)
+        if not filepath.exists():
+            raise FileNotFoundError(f"Reference audio not found: {filepath}")
 
-    def normalize_character_name(self, character: str) -> Optional[str]:
-        """Normalize character name to match available voices."""
-        if not character:
-            return None
+        with open(filepath, "rb") as f:
+            files = {"files": (filepath.name, f, "audio/wav")}
+            resp = requests.post(f"{self.base_url}/upload_reference", files=files)
 
-        character_lower = character.lower().strip()
-
-        if character_lower in self.character_mappings:
-            return self.character_mappings[character_lower]
-
-        for known_name, mapped_name in self.character_mappings.items():
-            if known_name in character_lower:
-                return mapped_name
-
-        for base_char in self.character_voices.keys():
-            if base_char in character_lower:
-                return base_char
-
-        return None
-
-    def _set_seed(self, seed: int):
-        """Set random seed for reproducibility."""
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        random.seed(seed)
-        np.random.seed(seed)
-
-    def get_model(self):
-        """Get or load the ChatterboxTTS model (singleton pattern)."""
-        if ChatterboxProvider._model_instance is None:
-            try:
-                from chatterbox.tts import ChatterboxTTS
-            except ImportError:
-                raise ImportError(
-                    "ChatterboxTTS not installed. Install via: pip install chatterbox-tts"
-                )
-
-            print(f"🔊 Loading ChatterboxTTS model on {self.device}...")
-            ChatterboxProvider._model_instance = ChatterboxTTS.from_pretrained(self.device)
-            print("✅ Model loaded successfully!")
-
-        return ChatterboxProvider._model_instance
+        resp.raise_for_status()
+        result = resp.json()
+        uploaded = result.get("uploaded_files")
+        if not uploaded:
+            raise RuntimeError("Upload succeeded but no filename returned.")
+        return uploaded[0]
 
     def generate(
         self,
         text: str,
-        character: str,
-        output_path: str,
-        exaggeration: float = 0.5,
+        reference_audio_filename: Optional[str] = None,
+        reference_audio_path: Optional[Union[str, Path]] = None,
+        language: str = "en",  # ISO 639-1 code
+        output_path: Union[str, Path] = "output.wav",
         temperature: float = 0.8,
-        seed: int = 0,
+        exaggeration: float = 0.5,
         cfg_weight: float = 0.5,
-        min_p: float = 0.05,
-        top_p: float = 1.0,
-        repetition_penalty: float = 1.2,
+        speed_factor: float = 1.0,
+        seed: int = 0,
+        split_text: bool = True,
+        chunk_size: int = 120,
+        output_format: str = "wav",
+        character: Optional[str] = None,  # ✅ Added for compatibility
+        **kwargs,
     ) -> str:
-        """Generate TTS with character voice using ChatterboxTTS."""
+        """
+        Generate TTS audio using the Chatterbox web service.
 
-        normalized_char = self.normalize_character_name(character)
+        Args:
+            text: Input text to synthesize.
+            reference_audio_filename: Name of already-uploaded reference file on server.
+            reference_audio_path: Local path to upload as reference (overrides filename).
+            character: Optional character name for automatic reference lookup.
+        """
 
-        if not normalized_char:
+        # --- Handle character voice mapping (if provided)
+        if character and not reference_audio_path and not reference_audio_filename:
+            mapped = self.character_voices.get(character)
+            if mapped:
+                reference_audio_filename = mapped
+                print(f"🎭 Using mapped reference for '{character}': {mapped}")
+            else:
+                print(f"⚠️ No mapped voice found for '{character}', will require manual upload or fallback.")
+
+        # --- Handle reference upload if needed
+        if reference_audio_path:
+            print(f"📤 Uploading reference audio: {reference_audio_path}")
+            reference_audio_filename = self.upload_reference_audio(reference_audio_path)
+
+        if not reference_audio_filename:
             raise ValueError(
-                f"❌ Unknown character: {character}. Available voices: {list(self.character_voices.keys())}"
+                "No reference audio provided. Must provide either `reference_audio_filename`, `reference_audio_path`, or mapped `character` voice."
             )
 
-        audio_prompt_path = self.voice_samples_dir / self.character_voices[normalized_char]
+        # Build payload (matches UI's getTTSFormData())
+        payload = {
+            "text": text.strip(),
+            "voice_mode": "clone",
+            "reference_audio_filename": reference_audio_filename,
+            "language": language,
+            "temperature": float(temperature),
+            "exaggeration": float(exaggeration),
+            "cfg_weight": float(cfg_weight),
+            "speed_factor": float(speed_factor),
+            "seed": int(seed),
+            "split_text": bool(split_text),
+            "chunk_size": int(chunk_size),
+            "output_format": output_format,
+        }
 
-        if not audio_prompt_path.exists():
-            raise FileNotFoundError(f"🎙️ Voice sample not found: {audio_prompt_path}")
-
-        print(f"🧠 Generating TTS for character: {character} → {normalized_char}")
-
-        # ✅ Step 1: Preprocess and clean the text
-        cleaned_text = self.preprocessor.clean(text)
-        sentences = self.preprocessor.segment(cleaned_text)
-        chunks = self.preprocessor.chunk_for_tts(sentences, max_chars=160)
-
-        print(f"📜 Text cleaned and split into {len(chunks)} chunk(s).")
-        print(f"🎤 Using reference voice: {audio_prompt_path}")
-
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-
-        model = self.get_model()
-
-        if seed:
-            self._set_seed(seed)
-
-        # ✅ Step 2: Generate and combine chunks
-        combined_audio = []
-        for i, chunk in enumerate(chunks):
-            print(f"🎧 Synthesizing chunk {i + 1}/{len(chunks)} ({len(chunk)} chars)...")
-            wav = model.generate(
-                chunk,
-                audio_prompt_path=str(audio_prompt_path),
-                exaggeration=exaggeration,
-                temperature=temperature,
-                cfg_weight=cfg_weight,
-                min_p=min_p,
-                top_p=top_p,
-                repetition_penalty=repetition_penalty,
+        print(f"📡 Sending TTS request (lang={language}) using reference: {reference_audio_filename}")
+        try:
+            resp = requests.post(
+                f"{self.base_url}/tts",
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
             )
-            combined_audio.append(wav.squeeze(0).numpy())
+            resp.raise_for_status()
+        except requests.HTTPError as e:
+            try:
+                detail = resp.json().get("detail", str(e))
+            except Exception:
+                detail = resp.text or str(e)
+            raise RuntimeError(f"TTS request failed: {detail}") from e
 
-        # ✅ Step 3: Add natural pause between chunks
-        pause_samples = int(0.25 * model.sr)  # 250ms pause
-        pause = np.zeros(pause_samples)
+        # --- Save output
+        output_path = Path(output_path).resolve()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(resp.content)
 
-        final_audio = np.concatenate(
-            [np.concatenate([chunk, pause]) for chunk in combined_audio]
-        )
-
-        wavfile.write(output_path, model.sr, final_audio)
-        print(f"✅ Character TTS saved: {output_path}")
-
+        print(f"✅ Audio saved to: {output_path}")
         return str(output_path)
+
+
+# Backward-compatible alias
+ChatterboxProvider = ChatterboxClient
+
+
