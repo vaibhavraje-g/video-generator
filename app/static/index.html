@@ -4,11 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Family Guy Video Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            --card-bg: #ffffff;
+            --text-primary: #2c3e50;
+            --text-secondary: #7f8c8d;
+            --border-color: #e0e0e0;
+            --divider-color: #cbd5e1;
+            --shadow: 0 10px 30px rgba(0,0,0,0.15);
+            --transition: all 0.3s ease;
         }
 
         body {
@@ -22,73 +35,143 @@
         }
 
         .container {
-            max-width: 700px;
             width: 100%;
+            max-width: 1400px;
             background: white;
-            padding: 40px;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
         }
 
-        h1 {
+        .header {
             text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--divider-color);
+        }
+
+        .header h1 {
+            color: var(--text-primary);
             font-size: 28px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            color: #e74c3c;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .column {
+            height: 100%;
+            overflow-y: auto;
+            padding: 25px;
+            transition: var(--transition);
+        }
+
+        .left-column {
+            width: 50%;
+            border-right: 1px solid var(--divider-color);
+            background: var(--card-bg);
+        }
+
+        .right-column {
+            width: 50%;
+            background: #f8fafc;
+        }
+
+        .column-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--divider-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .column-title i {
+            color: #e74c3c;
+        }
+
+        .right-column .column-title i {
+            color: #3498db;
         }
 
         textarea {
             width: 100%;
-            height: 120px;
-            padding: 15px;
+            height: 180px;
+            padding: 18px;
             margin-bottom: 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
             font-size: 16px;
             font-family: inherit;
-            resize: vertical;
-            transition: border-color 0.3s;
+            resize: none;
+            transition: var(--transition);
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
         textarea:focus {
             outline: none;
             border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
         }
 
         textarea::placeholder {
-            color: #999;
+            color: var(--text-secondary);
         }
 
-        button {
+        .generate-btn {
             width: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary-gradient);
             color: white;
             border: none;
-            padding: 15px 20px;
+            padding: 16px 20px;
             font-size: 18px;
             font-weight: 600;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: var(--transition);
             position: relative;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
         }
 
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
         }
 
-        button:active:not(:disabled) {
+        .generate-btn:active:not(:disabled) {
             transform: translateY(0);
         }
 
-        button:disabled {
+        .generate-btn:disabled {
             opacity: 0.7;
             cursor: not-allowed;
+            transform: none;
         }
 
-        button.loading::after {
+        .generate-btn.loading::after {
             content: '';
             position: absolute;
             top: 0;
@@ -110,12 +193,15 @@
             text-align: center;
             font-weight: 600;
             font-size: 16px;
-            color: #555;
+            color: var(--text-secondary);
+            padding: 10px;
+            border-radius: 8px;
+            background: #f8fafc;
         }
 
         .video-container {
             display: none;
-            margin-top: 30px;
+            margin-top: 20px;
             animation: fadeIn 0.5s ease-in;
         }
 
@@ -128,33 +214,75 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        .video-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            margin-bottom: 25px;
+            transition: var(--transition);
+        }
+
+        .video-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.18);
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-top: 177.78%; /* 9:16 Aspect Ratio (16/9 * 100 = 177.78%) */
+            background: #000;
+        }
+
         video {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-info {
+            padding: 18px;
+        }
+
+        .video-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .video-meta {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-secondary);
+            font-size: 14px;
             margin-bottom: 15px;
         }
 
         .download-btn {
             width: 100%;
-            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            background: var(--success-gradient);
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 14px 20px;
             font-size: 16px;
             font-weight: 600;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: var(--transition);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
+            box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
         }
 
         .download-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(39, 174, 96, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4);
         }
 
         .download-btn:active {
@@ -163,9 +291,9 @@
 
         .progress-bar {
             width: 100%;
-            height: 4px;
+            height: 6px;
             background: #e0e0e0;
-            border-radius: 2px;
+            border-radius: 3px;
             overflow: hidden;
             margin: 20px 0;
             display: none;
@@ -177,9 +305,9 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: var(--primary-gradient);
             width: 0%;
-            transition: width 0.3s ease;
+            transition: width 0.4s ease;
             animation: pulse 1.5s infinite;
         }
 
@@ -188,45 +316,213 @@
             50% { opacity: 0.7; }
         }
 
-        @media (max-width: 600px) {
-            .container {
-                padding: 25px;
-            }
+        .divider {
+            width: 6px;
+            background: var(--divider-color);
+            cursor: col-resize;
+            position: relative;
+        }
 
-            h1 {
+        .divider:hover {
+            background: #a0aec0;
+        }
+
+        .divider::before {
+            content: "⋮⋮";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(90deg);
+            color: #94a3b8;
+            font-size: 18px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .divider:hover::before {
+            opacity: 1;
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .left-column, .right-column {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--divider-color);
+            }
+            
+            .divider {
+                height: 6px;
+                width: 100%;
+                cursor: row-resize;
+            }
+            
+            .divider::before {
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                height: auto;
+                min-height: 90vh;
+            }
+            
+            .header h1 {
                 font-size: 24px;
             }
-
-            button {
+            
+            .column-title {
+                font-size: 18px;
+            }
+            
+            textarea {
+                height: 150px;
+            }
+            
+            .generate-btn, .download-btn {
+                padding: 14px;
                 font-size: 16px;
+            }
+            
+            .video-wrapper {
+                padding-top: 177.78%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                border-radius: 16px;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .column {
+                padding: 15px;
+            }
+            
+            .column-title {
+                font-size: 16px;
+            }
+            
+            textarea {
+                height: 120px;
+                padding: 14px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎥 Generate a Family Guy-Style Video</h1>
-        <textarea id="topic" placeholder="Enter your scene idea... (e.g., 'Peter fights a giant chicken')"></textarea>
-        <button id="generate">Generate Video</button>
-        
-        <div class="progress-bar" id="progressBar">
-            <div class="progress-fill" id="progressFill"></div>
+        <div class="header">
+            <h1><i class="fas fa-film"></i> Family Guy Video Generator</h1>
         </div>
         
-        <div id="status"></div>
-        
-        <div class="video-container" id="videoContainer">
-            <video id="preview" controls></video>
-            <button class="download-btn" id="downloadBtn">
-                <span>📥</span>
-                <span>Download Video</span>
-            </button>
+        <div class="main-content">
+            <div class="column left-column">
+                <h2 class="column-title"><i class="fas fa-comment-dots"></i> Prompt Generation</h2>
+                <textarea id="topic" placeholder="Enter your scene idea... (e.g., 'Peter fights a giant chicken at the Drunken Clam')"></textarea>
+                <button class="generate-btn" id="generate">
+                    <i class="fas fa-bolt"></i>
+                    <span>Generate Video</span>
+                </button>
+            </div>
+            
+            <div class="divider" id="divider"></div>
+            
+            <div class="column right-column">
+                <h2 class="column-title"><i class="fas fa-play-circle"></i> Video Preview</h2>
+                
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                
+                <div id="status">Enter a prompt and click "Generate Video" to create your Family Guy-style scene</div>
+                
+                <div class="video-container" id="videoContainer">
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video id="preview" controls></video>
+                        </div>
+                        <div class="video-info">
+                            <h3 class="video-title">Your Generated Scene</h3>
+                            <div class="video-meta">
+                                <span><i class="fas fa-clock"></i> 00:15</span>
+                                <span><i class="fas fa-calendar"></i> Just now</span>
+                            </div>
+                            <button class="download-btn" id="downloadBtn">
+                                <i class="fas fa-download"></i>
+                                <span>Download Video</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
     <script>
         let currentVideoUrl = null;
+        let isResizing = false;
+        let currentMinWidth = 300;
 
+        // Divider resizing functionality
+        const divider = document.getElementById('divider');
+        const leftColumn = document.querySelector('.left-column');
+        const rightColumn = document.querySelector('.right-column');
+        const container = document.querySelector('.container');
+
+        divider.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = window.getComputedStyle(divider).cursor;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const offset = e.clientX - containerRect.left;
+            
+            // Calculate new widths
+            let leftWidth = offset;
+            let rightWidth = containerWidth - leftWidth;
+            
+            // Enforce minimum widths
+            if (leftWidth < currentMinWidth) {
+                leftWidth = currentMinWidth;
+                rightWidth = containerWidth - leftWidth;
+            }
+            if (rightWidth < currentMinWidth) {
+                rightWidth = currentMinWidth;
+                leftWidth = containerWidth - rightWidth;
+            }
+            
+            leftColumn.style.width = `${leftWidth}px`;
+            rightColumn.style.width = `${rightWidth}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+        });
+
+        // Generate button functionality - RESTORED YOUR ORIGINAL API CODE
         document.getElementById('generate').addEventListener('click', async () => {
             const topic = document.getElementById('topic').value.trim();
             const status = document.getElementById('status');
@@ -304,7 +600,7 @@
             }
         });
 
-        // Download button handler
+        // Download button handler - RESTORED YOUR ORIGINAL DOWNLOAD CODE
         document.getElementById('downloadBtn').addEventListener('click', async () => {
             if (!currentVideoUrl) return;
 
@@ -349,6 +645,19 @@
                 document.getElementById('generate').click();
             }
         });
+
+        // Responsive adjustments
+        function adjustMinWidth() {
+            if (window.innerWidth <= 1024) {
+                currentMinWidth = 200;
+            } else {
+                currentMinWidth = 300;
+            }
+        }
+
+        window.addEventListener('resize', adjustMinWidth);
+        adjustMinWidth();
     </script>
 </body>
 </html>
+
