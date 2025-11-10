@@ -48,7 +48,6 @@ async def generate_video_endpoint(request: VideoRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # Serve the HTML page from static folder
 @app.get("/", response_class=FileResponse)
 def home():
