@@ -32,7 +32,7 @@ async def generate_video_endpoint(request: VideoRequest):
 
         # Call your existing async generator
         if request.video_type == "family_guy":
-            video_path = await generate_family_guy_video(
+            await generate_family_guy_video(
                 topic=request.topic,
                 output_path=str(output_path)
             )
