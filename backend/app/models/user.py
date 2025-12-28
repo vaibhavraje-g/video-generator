@@ -2,27 +2,34 @@
 """User model for MongoDB"""
 
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, Any
+from pydantic import BaseModel, EmailStr, Field, GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 from bson import ObjectId
 
 
-class PyObjectId(ObjectId):
-    """Custom ObjectId type for Pydantic"""
+class PyObjectId(str):
+    """Custom ObjectId type for Pydantic v2"""
     
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls.validate,
+            core_schema.str_schema(),
+            serialization=core_schema.to_string_ser_schema(),
+        )
     
     @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
-    
-    @classmethod
-    def __get_pydantic_json_schema__(cls, field_schema):
-        field_schema.update(type="string")
+    def validate(cls, v: Any) -> str:
+        if isinstance(v, ObjectId):
+            return str(v)
+        if isinstance(v, str):
+            if ObjectId.is_valid(v) or v == "dev_user_id":
+                return v
+            raise ValueError(f"Invalid ObjectId: {v}")
+        raise ValueError(f"Invalid ObjectId type: {type(v)}")
 
 
 class UserBase(BaseModel):

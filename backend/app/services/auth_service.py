@@ -63,6 +63,18 @@ class AuthService:
     
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         """Get user by ID"""
+        # BYPASS FOR TESTING
+        if user_id == "dev_user_id":
+            return User(
+                _id="dev_user_id",
+                email="dev@vidgen.ai",
+                username="developer",
+                hashed_password="hashed_bypass_password",
+                is_active=True,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+
         if not ObjectId.is_valid(user_id):
             return None
         

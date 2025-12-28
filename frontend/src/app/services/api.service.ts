@@ -63,7 +63,7 @@ export interface GenerateVideoRequest {
   providedIn: 'root'
 })
 export class ApiService {
-  private readonly API_BASE = 'http://localhost:8000/api/v1';
+  private readonly API_BASE = 'http://localhost:8001/api/v1';
   private readonly STORAGE_KEY_TOKEN = 'vidgen_token';
   private readonly STORAGE_KEY_USER = 'vidgen_user';
 

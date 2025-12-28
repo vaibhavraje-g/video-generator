@@ -6,7 +6,7 @@ from typing import Dict
 class Settings(BaseSettings):
     # --- Core API ---
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_PORT: int = 8001
     DEBUG: bool = False
 
     # --- Database ---

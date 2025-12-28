@@ -55,6 +55,9 @@ import { ApiService } from '../services/api.service';
                 Sign in
               }
             </button>
+            <button type="button" (click)="bypassLogin()" class="mt-4 group relative flex w-full justify-center rounded-lg border border-amber-600 px-3 py-3 text-sm font-semibold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 transition-all">
+              Skip Login (Dev Mode)
+            </button>
           </div>
         </form>
       </div>
@@ -89,5 +92,34 @@ export class LoginComponent {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  async bypassLogin() {
+    localStorage.setItem('vidgen_token', 'dev_token');
+    
+    // Set a dummy user structure that matches what ApiService expects
+    const dummyUser = {
+      _id: 'dev_user_id',
+      email: 'dev@vidgen.ai',
+      username: 'developer'
+    };
+    
+    localStorage.setItem('vidgen_user', JSON.stringify(dummyUser));
+    
+    // Force refresh of current user signal in API service if possible, or just reload
+    // Since we can't easily access the signal setter from here without exposing it, 
+    // we'll rely on the dashboard guard/init to pick it up or just reload.
+    // Better: let's try to reload the page to ensure fresh state or just navigate.
+    
+    // We need to update the ApiService state. Since we can't directly set the signal from here (it's protected/private logic usually, 
+    // but looking at ApiService, currentUser is a public signal but loadUser is private).
+    // Actually, ApiService.currentUser is initialized from localStorage.
+    // So if we set localStorage and then trigger a refresh/navigate, it might work if we reload.
+    // Or we can add a method to ApiService to setDevMode.
+    // For now, simple localStorage + reload/navigate.
+    
+    // Let's use window.location.reload() to be sure everything initializes correctly with the token.
+    window.location.href = '/#/dashboard';
+    window.location.reload();
   }
 }
